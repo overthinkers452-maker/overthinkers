@@ -1,0 +1,769 @@
+Here is your complete, final, maximum-quality prompt:
+
+---
+
+# overthinkers — Complete World-Class PRD Prompt
+
+## Master Instruction
+
+You are a senior product architect with experience at Meta, Reddit, Stripe, Notion, and Linear.
+
+Your task is to write the complete **overthinkers PRD** from Section 1 to Section 110.
+
+This document must be detailed enough that:
+- A designer can build every screen directly from it
+- A developer can implement every feature directly from it
+- A CTO can architect the entire system from it
+- An investor can evaluate the full business from it
+- A new executive team can run the company from it
+
+**Output quality benchmark:** Match the standard of internal product documents produced by Meta, Stripe, Notion, Linear, and Reddit.
+
+---
+
+## Formatting Rules
+
+- Every section has a number and title
+- Every section contains: Purpose, Requirements, Details, and where relevant: Formula, Schema, Flow, or Wireframe
+- Use consistent heading hierarchy throughout
+- Use code blocks for schemas, APIs, flows, tokens, and wireframes
+- Use tables for comparisons, metrics, and competitive analysis
+- No bullet point padding — every line must carry real information
+- No repeated content across sections
+- Minimum depth per section: 300 words
+- Sections 82–110 minimum depth: 500 words each
+
+---
+
+## Document Structure
+
+---
+
+### PART 1 — Product Foundation
+Sections 1–11
+
+```
+1.  Product Vision
+2.  Mission Statement
+3.  Core Differentiators
+4.  Product Goals
+5.  Target Audience
+6.  User Personas
+7.  Product Principles
+8.  Brand Identity
+9.  Design Language
+10. Information Architecture
+11. Success Metrics
+```
+
+**Requirements per section:**
+
+Section 1 — Include platform positioning, emotional promise, and long-term vision statement.
+
+Section 3 — Include anonymity as core differentiator with full explanation of why it matters.
+
+Section 5 — Include primary and secondary audiences with age, interests, device usage, and platform behavior.
+
+Section 6 — Minimum 3 personas. Each must include: name, age, occupation, goals, pain points, platform behavior, and quote.
+
+Section 9 — Include full design language: typography, color philosophy, motion principles, component style, dark/light mode rules.
+
+Section 11 — Include user metrics, engagement metrics, quality metrics, business metrics, and safety metrics with target values.
+
+---
+
+### PART 2 — Core Product Experience
+Sections 12–28
+
+```
+12. Authentication & Onboarding
+13. Header Navigation
+14. Navigation Drawer
+15. Category Navigation
+16. Feed Architecture
+17. Thought Card
+18. Poll System
+19. Engagement System
+20. Comment System
+21. Thought Composer
+22. Profile System
+23. Discovery Page
+24. Search System
+25. Notification Center
+26. Empty States
+27. Loading States
+28. Error Handling
+```
+
+**Requirements per section:**
+
+Section 12 — Include guest mode permissions table, full sign-up validation rules, onboarding flow diagram, and Google Sign-In future plan.
+
+Section 16 — Include all four feed types (For You, Following, Trending, Latest) with full personalization signal list.
+
+Section 17 — Include all thought types (standard, quote, poll, future types) with full card anatomy.
+
+Section 18 — Include full poll lifecycle: creation, voting, results, expiry, closed state. Include voting rules and animation specs.
+
+Section 21 — Include full composer fields, posting mode selector (Public / Pseudonymous / Anonymous), poll toggle, character counter, and publish flow.
+
+Section 24 — Include search types, ranking signals, autocomplete rules, typo tolerance, and trending search logic.
+
+---
+
+### PART 3 — Platform Systems
+Sections 29–48
+
+```
+29. Feed Ranking Engine
+30. Quality Score System
+31. Recommendation System
+32. Leaderboard System
+33. Reputation System
+34. Gamification System
+35. Daily Engagement System
+36. Trust & Safety Framework
+37. Reporting System
+38. Moderation Pipeline
+39. Enforcement Actions
+40. Appeals System
+41. Block & Restrict System
+42. Anti-Spam System
+43. Accessibility Requirements
+44. Offline Support
+45. Security Architecture
+46. Privacy Controls
+47. Abuse Detection AI
+48. Audit Logging
+```
+
+**Requirements per section:**
+
+Section 30 — Include full Quality Score formula with all variables, weights, negative signals, and time decay explanation.
+
+```
+Score =
+(Appreciations × 2 + Comments × 3 + Reposts × 5 +
+Saves × 4 + Profile Visits × 0.5 + Poll Participation × 2)
+÷ (Hours Since Posted + 2)^1.5
+
+Negative: Reports × -10, Blocks × -15, Spam × -20
+```
+
+Section 38 — Include full risk pipeline: Low / Medium / High / Critical with specific actions at each tier.
+
+Section 43 — Full WCAG 2.1 AA compliance: keyboard navigation, focus states, ARIA labels, contrast ratios, reduced motion, touch targets.
+
+Section 45 — Include Argon2 password hashing, JWT architecture, rate limiting, brute force prevention, suspicious login alerts.
+
+Section 48 — Include immutable audit log schema, 12-month retention, admin accountability rules.
+
+---
+
+### PART 4 — Technical & Business
+Sections 49–61
+
+```
+49. Technical Architecture Overview
+50. Database Design
+51. API Architecture
+52. Frontend Architecture
+53. Backend Architecture
+54. Analytics Framework
+55. Monetization Strategy
+56. Scalability Strategy
+57. Performance Targets
+58. Quality Assurance
+59. Launch KPIs
+60. Product Roadmap
+61. Final Product Principles
+```
+
+**Requirements per section:**
+
+Section 49 — Include full recommended stack:
+```
+Frontend:   React + Next.js + TypeScript + Tailwind CSS
+Mobile:     Flutter (preferred) or React Native
+Backend:    Node.js + Express.js (or NestJS)
+Database:   PostgreSQL
+Auth:       JWT + Refresh Tokens (or Supabase Auth)
+Storage:    AWS S3 or Supabase Storage
+Search:     PostgreSQL FTS → Elasticsearch
+Hosting:    Vercel + Railway/Render + Supabase/Neon
+```
+
+Section 50 — Include complete database schema for every table:
+```
+users, thoughts, comments, appreciations, disagreements,
+saved_thoughts, reposts, polls, poll_options, poll_votes,
+notifications, reports, followers, aliases, anonymity_audit
+```
+
+Section 51 — Include all REST endpoints with HTTP method and path.
+
+Section 56 — Include three scalability phases with user targets and infrastructure additions per phase.
+
+Section 59 — Include specific numeric KPIs for Day 7, Day 30, and Day 90.
+
+Section 60 — Include roadmap from v1.0 through v4.0 with specific features per version.
+
+---
+
+### PART 5 — Anonymity, Positioning & Growth
+Sections 62–74
+
+```
+62. Anonymous & Pseudonymous Posting System
+63. Competitive Positioning Framework
+64. Creator Growth System
+65. Notification Delivery Infrastructure
+66. Search Ranking & Discovery Logic
+67. Content Lifecycle Management
+68. Administrative Dashboard
+69. Feed Integrity & Anti-Manipulation System
+70. Community Health Monitoring
+71. Public Transparency Center
+72. Advanced Security & Compliance
+73. Growth & Referral System
+74. Success Definition
+```
+
+**Requirements per section:**
+
+Section 62 — Include all three posting modes (Public, Pseudonymous, Anonymous) with full rules, display behavior, safety controls, and reputation handling.
+
+Section 63 — Include competitive comparison table against X, Threads, Reddit, Quora with feature matrix showing overthinkers advantages.
+
+Section 67 — Include thought editing rules (30-minute window), edit indicator, edit history, soft delete (30-day recovery), hard delete conditions.
+
+Section 69 — Include engagement ring detection, vote manipulation signals, trust weighting by reputation score, anomaly detection thresholds.
+
+---
+
+### PART 6 — Database Extensions & Screen Flows
+Sections 75–76
+
+```
+75. Anonymity Database Schema Extensions
+76. Key Screen Flow References
+```
+
+**Requirements:**
+
+Section 75 — Include updated thoughts table fields, aliases table, anonymity_audit table, updated users table, and privacy rules for real_author_id.
+
+Section 76 — Include minimum 6 complete user journey flows:
+```
+Flow 1: Guest to First Thought
+Flow 2: Anonymous Thought Publishing
+Flow 3: Report & Moderation Flow
+Flow 4: Badge Earned
+Flow 5: Appeal Flow
+Flow 6: Discovery to Follow
+```
+
+---
+
+### PART 7 — Design System & QA
+Sections 77–81
+
+```
+77. Wireframe Specifications
+78. Design Token Specification
+79. Internationalisation & Localisation Plan
+80. Testing & QA Specification
+81. Launch Checklist
+```
+
+**Requirements:**
+
+Section 77 — Include ASCII wireframes for minimum 7 screens:
+```
+Screen 1: Home Feed
+Screen 2: Thought Composer (Mobile)
+Screen 3: Profile Page
+Screen 4: Discovery Page
+Screen 5: Notification Center
+Screen 6: Anonymous Thought Card
+Screen 7: Admin Dashboard
+```
+
+Section 78 — Include complete design token set:
+```
+Colors (dark + light mode)
+Typography (family, sizes, weights, line heights)
+Spacing scale
+Border radius scale
+Shadow scale
+Animation tokens (duration + easing curves)
+Component tokens (card, button, input, avatar, FAB, nav)
+```
+
+Section 79 — Include Phase 1 (English + Hindi) and Phase 2 expansion languages with full RTL support plan.
+
+Section 80 — Include unit tests, integration tests, E2E tests, accessibility tests, performance benchmarks, and device coverage matrix.
+
+Section 81 — Include go/no-go checklist across: Product, Safety, Technical, Performance, Legal, Monitoring.
+
+---
+
+### PART 8 — Investor & Operator Grade Systems
+Sections 82–110
+
+---
+
+**Global requirement for Sections 82–110:**
+
+Every section must contain:
+- Purpose
+- Goals
+- Architecture or Design
+- Functional Requirements
+- Non-Functional Requirements
+- Metrics & Targets
+- Risks & Mitigations
+- Future Expansion
+
+Minimum 500 words per section.
+Maximum technical and business depth throughout.
+
+---
+
+```
+82.  Product Analytics Event Taxonomy
+83.  Data Warehouse & Business Intelligence
+84.  Experimentation Platform (A/B Testing)
+85.  Recommendation Engine v2
+86.  Feed Explainability Framework
+87.  Reliability Engineering (SLOs & SLAs)
+88.  Disaster Recovery Plan
+89.  Observability Platform
+90.  Incident Response Framework
+91.  Community Spaces Architecture
+92.  Community Reputation System
+93.  Creator Economy Infrastructure
+94.  Financial Model
+95.  Cost Architecture
+96.  Strategic Growth Engine
+97.  Retention System
+98.  Lifecycle Messaging Framework
+99.  AI Discussion Assistant
+100. AI Moderation Architecture
+101. Knowledge Graph System
+102. Topic Intelligence Engine
+103. Governance Framework
+104. Transparency Framework v2
+105. International Expansion Strategy
+106. Compliance Roadmap
+107. Platform Moat Analysis
+108. Competitive Defense Strategy
+109. Five-Year Product Vision
+110. Founder Operating Principles
+```
+
+---
+
+**Section-specific requirements for Part 8:**
+
+**Section 82 — Analytics Event Taxonomy**
+
+Define every tracked event with full payload:
+```
+Events required:
+feed_viewed, feed_refreshed, thought_impression,
+thought_opened, reading_started, reading_completed,
+comment_posted, user_followed, thought_saved,
+search_performed, poll_voted, notification_opened,
+profile_viewed, share_clicked, composer_opened,
+thought_published, anonymous_mode_selected,
+badge_earned, report_submitted, appeal_submitted
+
+For every event include:
+- Event name (snake_case)
+- Trigger condition
+- Required properties
+- Optional properties
+- Example JSON payload
+```
+
+**Section 83 — Data Warehouse**
+```
+Define full pipeline:
+Client → Event Collector → Kafka → ClickHouse/BigQuery
+→ dbt transformations → Analytics dashboards
+
+Include:
+- Data retention policy
+- PII handling rules
+- Dashboard ownership
+- Query governance
+```
+
+**Section 84 — Experimentation Platform**
+```
+Include:
+- Feature flag architecture
+- Experiment assignment logic
+- Statistical significance thresholds (p < 0.05)
+- Minimum detectable effect sizes
+- Guardrail metrics
+- Experiment approval workflow
+- Rollback criteria
+- Canary release percentages: 1% → 5% → 25% → 100%
+```
+
+**Section 85 — Recommendation Engine v2**
+```
+Five-layer architecture:
+Layer 1: Candidate Generation (collaborative filtering)
+Layer 2: Scoring (quality score + behavioral signals)
+Layer 3: Re-ranking (diversity, freshness, category balance)
+Layer 4: Exploration Boost (new creators, new topics)
+Layer 5: Personalization Override (explicit user preferences)
+
+Include cold start strategy for new users.
+Include staleness prevention logic.
+```
+
+**Section 86 — Feed Explainability**
+
+```
+Every thought card must show one reason label:
+- "Because you follow [creator]"
+- "Trending in [category]"
+- "Popular among [interest] readers"
+- "New from someone you follow"
+- "Highly discussed today"
+
+Define UI placement, character limits, dismissal rules.
+```
+
+**Section 87 — Reliability Engineering**
+```
+Define SLOs for every service:
+
+Feed API:           99.9% availability, p99 < 500ms
+Search API:         99.5% availability, p99 < 300ms
+Auth API:           99.99% availability, p99 < 200ms
+Notification API:   99.5% availability, delivery < 5s
+Moderation Queue:   99.9% availability, p99 < 2s
+
+Error budget calculation per service.
+Burn rate alerting thresholds.
+```
+
+**Section 88 — Disaster Recovery**
+```
+Define:
+RTO (Recovery Time Objective): < 1 hour
+RPO (Recovery Point Objective): < 5 minutes
+
+Incident severity levels:
+SEV-1: Full outage
+SEV-2: Major feature degraded
+SEV-3: Minor feature degraded
+SEV-4: Performance degraded
+
+Backup strategy:
+- PostgreSQL: continuous WAL archiving
+- Media: S3 cross-region replication
+- Config: Git-versioned infrastructure
+```
+
+**Section 89 — Observability Platform**
+```
+Three pillars:
+Logs:    Structured JSON → Loki/CloudWatch
+Metrics: Prometheus → Grafana dashboards
+Traces:  OpenTelemetry → Jaeger/Tempo
+
+Required dashboards:
+- Feed performance
+- API error rates
+- Database query latency
+- Notification delivery rate
+- Moderation queue depth
+```
+
+**Section 90 — Incident Response**
+```
+Roles:
+- Incident Commander
+- Technical Lead
+- Communications Lead
+- Scribe
+
+Escalation tree:
+SEV-4 → On-call engineer
+SEV-3 → Team lead
+SEV-2 → Engineering manager
+SEV-1 → CTO + CEO
+
+Postmortem template:
+- Timeline
+- Root cause
+- Impact
+- Detection gap
+- Resolution steps
+- Prevention actions
+```
+
+**Section 91 — Community Spaces**
+```
+Three community types:
+Public:      Anyone can join and post
+Private:     Request to join, approved by moderator
+Invite-Only: Direct invitation required
+
+Each community has:
+- Name, description, rules
+- Community moderators
+- Quality score threshold for posting
+- Member count, post volume metrics
+- Community health score
+```
+
+**Section 92 — Community Reputation**
+```
+Community-level trust scores separate from platform scores.
+Moderator reputation tracked independently.
+Community health score factors:
+- Report rate
+- Post quality average
+- Retention rate
+- Discussion depth score
+```
+
+**Section 93 — Creator Economy**
+```
+Revenue streams for creators:
+- Tips: one-time appreciation payments
+- Memberships: monthly subscriber access
+- Paid communities: gated spaces
+
+Platform revenue share: 80% creator / 20% platform
+Payout minimum: $10
+Payout schedule: Monthly
+Payout methods: Stripe Connect, UPI (India), PayPal
+```
+
+**Section 94 — Financial Model**
+```
+Build projections at three scales:
+
+10K users:
+- Premium conversion: 5% = 500 subscribers
+- ARPU: $4/month
+- MRR: $2,000
+
+100K users:
+- Premium conversion: 8% = 8,000 subscribers
+- ARPU: $5/month
+- MRR: $40,000
+
+1M users:
+- Premium conversion: 10% = 100,000 subscribers
+- ARPU: $6/month
+- MRR: $600,000
+
+Include CAC assumptions, LTV/CAC ratio targets,
+payback period, and break-even analysis.
+```
+
+**Section 95 — Cost Architecture**
+```
+Estimate monthly infrastructure costs at each scale:
+
+10K users:
+- Database: $25
+- Hosting: $20
+- CDN: $10
+- AI moderation: $50
+- Total: ~$150/month
+
+100K users:
+- Database: $200
+- Hosting: $300
+- CDN: $150
+- AI moderation: $500
+- Total: ~$1,500/month
+
+1M users:
+- Database: $2,000
+- Hosting: $5,000
+- CDN: $3,000
+- AI moderation: $8,000
+- Total: ~$25,000/month
+```
+
+**Section 96 — Growth Engine**
+```
+Define four growth loops:
+
+Loop 1 — Content Loop:
+Creator posts → Feed distribution → Reader engagement
+→ Creator grows → Creator posts more
+
+Loop 2 — Referral Loop:
+User shares thought → External viewer sees content
+→ Clicks → Lands on platform → Signs up
+
+Loop 3 — Creator Acquisition Loop:
+Quality creator joins → Brings audience
+→ Audience discovers platform → New creators emerge
+
+Loop 4 — SEO Loop:
+Public thoughts indexed by Google
+→ Search traffic → Landing → Sign up
+```
+
+**Section 97 — Retention System**
+```
+Targets:
+D1:  > 60%
+D7:  > 35%
+D30: > 20%
+D90: > 12%
+
+Retention strategies per cohort:
+New users (D1–D7):
+- Onboarding completion push
+- First thought celebration
+- First follower notification
+
+Active users (D7–D30):
+- Daily prompt
+- Weekly debate notification
+- Badge progress update
+
+At-risk users (no activity 7+ days):
+- Win-back push: "New thoughts in [category]"
+- Weekly digest email
+- Trending thought notification
+```
+
+**Section 98 — Lifecycle Messaging**
+```
+Define campaigns:
+
+Onboarding series (D0–D7):
+Day 0: Welcome + first thought prompt
+Day 1: Discover trending thoughts
+Day 3: Follow suggested creators
+Day 7: Badge progress update
+
+Re-engagement (inactive 7 days):
+Push: "You missed [X] thoughts in [category]"
+Email: Weekly digest with top thoughts
+
+Win-back (inactive 30 days):
+Email: "Here's what's new on overthinkers"
+Push: "A creator you follow posted something"
+
+All campaigns must respect:
+- Notification preferences
+- Frequency caps (max 1 push/day)
+- Opt-out honoured immediately
+```
+
+**Section 99 — AI Discussion Assistant**
+```
+Features:
+- Thread summaries (TL;DR for long discussions)
+- Counterargument suggestions
+- Perspective discovery ("Others think...")
+- Debate synthesis (summary of both sides)
+- Related thought recommendations
+
+Privacy rules:
+- AI never identifies anonymous authors
+- Processing happens server-side
+- No user data used for model training without consent
+
+UI placement:
+- Summary appears at top of long comment threads
+- Perspective discovery appears after user reads a thought
+- Always labeled: "AI Summary" or "AI Perspective"
+```
+
+**Section 100 — AI Moderation Architecture**
+```
+Detection pipeline:
+
+Input → Pre-filter (rule-based)
+→ Toxicity model (confidence score)
+→ Category classifier (hate/spam/fraud)
+→ Risk score calculation
+→ Threshold decision:
+
+Score 0–30:   Auto-approve
+Score 31–60:  Queue for human review
+Score 61–80:  Hide + priority review
+Score 81–100: Auto-remove + admin alert
+
+Models:
+- Toxicity: Perspective API or fine-tuned BERT
+- Spam: Custom classifier on platform data
+- Fraud: Rule-based + anomaly detection
+
+Every AI decision logged with:
+- Confidence score
+- Model version
+- Decision timestamp
+- Human override (if applicable)
+```
+
+**Section 101 — Knowledge Graph**
+```
+Nodes:
+- Users
+- Thoughts
+- Topics
+- Categories
+- Communities
+- Tags
+
+Edges:
+- User → follows → User
+- User → appreciates → Thought
+- Thought → tagged → Topic
+- Topic → belongs_to → Category
+- User → interested_in → Topic
+
+Uses:
+- Recommendation engine input
+- Topic clustering
+- Community suggestion
+- Creator similarity scoring
+```
+
+**Section 102 — Topic Intelligence Engine**
+```
+Automatically detect:
+- Emerging topics (velocity > baseline × 3)
+- Trending debates (disagree/appreciate ratio > 0.4)
+- Community interests (topic clusters per user segment)
+
+Output feeds:
+- Discovery page trending topics
+- Admin alerts for sensitive emerging topics
+- Creator dashboard topic suggestions
+- Weekly debate selection
+```
+
+**Section 103 — Governance Framework**
+```
+Internal review boards:
+- Trust & Safety Council (meets weekly)
+- Product Ethics Board (meets monthly)
+- Community Advisory Panel (meets quarterly)
+
+Policy change process:
+Draft → Internal review → Community consultation
+→ 14-day public comment → Final decision → Publish
+
+Emergency policy changes:
+Can bypass consultation for safety-critical issues.
+Must be reviewed within 30 days post-implementation.
+```
