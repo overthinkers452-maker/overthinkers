@@ -14,7 +14,7 @@ function NativeTabLayout() {
     <NativeTabs>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>Home</Label>
+        <Label>Feed</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="discover">
         <Icon sf={{ default: "safari", selected: "safari.fill" }} />
@@ -22,7 +22,7 @@ function NativeTabLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="notifications">
         <Icon sf={{ default: "bell", selected: "bell.fill" }} />
-        <Label>Inbox</Label>
+        <Label>Alerts</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person.circle", selected: "person.circle.fill" }} />
@@ -46,14 +46,21 @@ function ClassicTabLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         headerShown: false,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontFamily: "Inter_500Medium",
+          marginTop: 2,
+        },
         tabBarStyle: {
           position: "absolute",
-          backgroundColor: isIOS ? "transparent" : colors.background,
+          backgroundColor: isIOS ? "transparent" : colors.card,
           borderTopWidth: 1,
           borderTopColor: colors.border,
           elevation: 0,
-          height: isWeb ? 84 : 56,
+          height: isWeb ? 84 : 62,
+          paddingBottom: isWeb ? 12 : 8,
+          paddingTop: 6,
         },
         tabBarBackground: () =>
           isIOS ? (
@@ -63,14 +70,14 @@ function ClassicTabLayout() {
               style={StyleSheet.absoluteFill}
             />
           ) : isWeb ? (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.card }]} />
           ) : null,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: "Feed",
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
               <SymbolView name={focused ? "house.fill" : "house"} tintColor={color} size={22} />
@@ -94,53 +101,34 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="notifications"
         options={{
-          title: "Inbox",
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <View>
+          title: "Alerts",
+          tabBarIcon: ({ color, focused }) => (
+            <View>
+              {isIOS ? (
                 <SymbolView name={focused ? "bell.fill" : "bell"} tintColor={color} size={22} />
-                {unreadCount > 0 && (
-                  <View style={{
-                    position: "absolute",
-                    top: -3,
-                    right: -6,
-                    backgroundColor: colors.disagree,
-                    borderRadius: 8,
-                    minWidth: 16,
-                    height: 16,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingHorizontal: 3,
-                  }}>
-                    <Text style={{ color: "#fff", fontSize: 10, fontFamily: "Inter_700Bold" }}>
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            ) : (
-              <View>
+              ) : (
                 <Feather name="bell" size={22} color={color} />
-                {unreadCount > 0 && (
-                  <View style={{
-                    position: "absolute",
-                    top: -3,
-                    right: -6,
-                    backgroundColor: colors.disagree,
-                    borderRadius: 8,
-                    minWidth: 16,
-                    height: 16,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingHorizontal: 3,
-                  }}>
-                    <Text style={{ color: "#fff", fontSize: 10, fontFamily: "Inter_700Bold" }}>
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            ),
+              )}
+              {unreadCount > 0 && (
+                <View style={{
+                  position: "absolute",
+                  top: -4,
+                  right: -7,
+                  backgroundColor: colors.disagree,
+                  borderRadius: 8,
+                  minWidth: 16,
+                  height: 16,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingHorizontal: 3,
+                }}>
+                  <Text style={{ color: "#fff", fontSize: 10, fontFamily: "Inter_700Bold" }}>
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
