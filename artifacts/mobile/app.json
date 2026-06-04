@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "overthinkers",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -14,11 +14,30 @@
       "backgroundColor": "#09090E"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.overthinkers.app",
+      "buildNumber": "1"
     },
-    "android": {},
+    "android": {
+      "package": "com.overthinkers.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#09090E"
+      },
+      "permissions": []
+    },
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/images/icon.png",
+      "bundler": "metro",
+      "output": "static",
+      "themeColor": "#5B5BD6",
+      "backgroundColor": "#09090E",
+      "shortName": "overthinkers",
+      "display": "standalone",
+      "startUrl": "/mobile/",
+      "scope": "/mobile/",
+      "description": "A quality-first anonymous and pseudonymous discussion platform. Think freely. Post honestly."
     },
     "plugins": [
       [
