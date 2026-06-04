@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { calculateQualityScore } from "@/utils/format";
 
 export type PostingMode = "Public" | "Pseudonymous" | "Anonymous";
 export type FeedType = "For You" | "Following" | "Trending" | "Latest";
@@ -31,12 +32,16 @@ export interface Thought {
   reposts: number;
   saves: number;
   comments: number;
+  reportCount: number;
   qualityScore: number;
   createdAt: string;
+  isEdited: boolean;
+  editedAt?: string;
   hasAppreciated: boolean;
   hasDisagreed: boolean;
   hasSaved: boolean;
   hasReposted: boolean;
+  hasReported: boolean;
   type: "standard" | "poll";
   poll?: Poll;
   feedReason?: string;
@@ -84,15 +89,21 @@ interface AppContextType {
   notifications: Notification[];
   currentUser: AppUser;
   unreadCount: number;
-  addThought: (thought: Omit<Thought, "id" | "createdAt" | "qualityScore" | "appreciations" | "disagreements" | "reposts" | "saves" | "comments" | "hasAppreciated" | "hasDisagreed" | "hasSaved" | "hasReposted">) => void;
+  addThought: (thought: Omit<Thought, "id" | "createdAt" | "qualityScore" | "appreciations" | "disagreements" | "reposts" | "saves" | "comments" | "reportCount" | "hasAppreciated" | "hasDisagreed" | "hasSaved" | "hasReposted" | "hasReported" | "isEdited" | "editedAt">) => void;
+  editThought: (thoughtId: string, newContent: string) => boolean;
+  deleteThought: (thoughtId: string) => void;
   toggleAppreciate: (thoughtId: string) => void;
   toggleDisagree: (thoughtId: string) => void;
   toggleSave: (thoughtId: string) => void;
   toggleRepost: (thoughtId: string) => void;
+  reportThought: (thoughtId: string) => void;
   votePoll: (thoughtId: string, optionIndex: number) => void;
   addComment: (comment: Omit<Comment, "id" | "createdAt" | "appreciations" | "hasAppreciated">) => void;
+  toggleCommentAppreciate: (thoughtId: string, commentId: string) => void;
   markAllRead: () => void;
 }
+
+// ─── Seed Data ──────────────────────────────────────────────────────────────
 
 const SEED_THOUGHTS: Thought[] = [
   {
@@ -108,12 +119,15 @@ const SEED_THOUGHTS: Thought[] = [
     reposts: 203,
     saves: 412,
     comments: 67,
-    qualityScore: 94.2,
+    reportCount: 0,
+    qualityScore: 0,
     createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    isEdited: false,
     hasAppreciated: false,
     hasDisagreed: false,
     hasSaved: false,
     hasReposted: false,
+    hasReported: false,
     type: "standard",
     feedReason: "Trending in Philosophy",
   },
@@ -130,12 +144,15 @@ const SEED_THOUGHTS: Thought[] = [
     reposts: 445,
     saves: 876,
     comments: 142,
-    qualityScore: 98.1,
+    reportCount: 0,
+    qualityScore: 0,
     createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+    isEdited: false,
     hasAppreciated: false,
     hasDisagreed: false,
     hasSaved: false,
     hasReposted: false,
+    hasReported: false,
     type: "standard",
     feedReason: "Highly discussed today",
   },
@@ -153,12 +170,15 @@ const SEED_THOUGHTS: Thought[] = [
     reposts: 98,
     saves: 201,
     comments: 89,
-    qualityScore: 87.4,
+    reportCount: 0,
+    qualityScore: 0,
     createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
+    isEdited: false,
     hasAppreciated: false,
     hasDisagreed: false,
     hasSaved: false,
     hasReposted: false,
+    hasReported: false,
     type: "poll",
     feedReason: "Popular among Technology readers",
     poll: {
@@ -186,12 +206,15 @@ const SEED_THOUGHTS: Thought[] = [
     reposts: 891,
     saves: 1204,
     comments: 234,
-    qualityScore: 99.3,
+    reportCount: 0,
+    qualityScore: 0,
     createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+    isEdited: false,
     hasAppreciated: true,
     hasDisagreed: false,
     hasSaved: true,
     hasReposted: false,
+    hasReported: false,
     type: "standard",
     feedReason: "Because you follow vikramnair",
   },
@@ -208,12 +231,15 @@ const SEED_THOUGHTS: Thought[] = [
     reposts: 234,
     saves: 567,
     comments: 198,
-    qualityScore: 82.7,
+    reportCount: 0,
+    qualityScore: 0,
     createdAt: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(),
+    isEdited: false,
     hasAppreciated: false,
     hasDisagreed: false,
     hasSaved: false,
     hasReposted: false,
+    hasReported: false,
     type: "standard",
     feedReason: "Trending in Technology",
   },
@@ -231,54 +257,155 @@ const SEED_THOUGHTS: Thought[] = [
     reposts: 1204,
     saves: 2341,
     comments: 445,
-    qualityScore: 99.8,
+    reportCount: 0,
+    qualityScore: 0,
     createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    isEdited: false,
     hasAppreciated: false,
     hasDisagreed: false,
     hasSaved: false,
     hasReposted: false,
+    hasReported: false,
     type: "standard",
     feedReason: "New from someone you follow",
   },
+  {
+    id: "7",
+    content: "We rest so that we can keep working. We eat so that we can keep working. We sleep so that we can keep working. At what point did we forget that working was supposed to serve living, not the other way around?",
+    authorId: "anon3",
+    authorName: "Anonymous",
+    authorUsername: "",
+    postingMode: "Anonymous",
+    category: "Society",
+    appreciations: 3500,
+    disagreements: 123,
+    reposts: 1200,
+    saves: 892,
+    comments: 445,
+    reportCount: 0,
+    qualityScore: 0,
+    createdAt: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString(),
+    isEdited: false,
+    hasAppreciated: false,
+    hasDisagreed: false,
+    hasSaved: false,
+    hasReposted: false,
+    hasReported: false,
+    type: "standard",
+    feedReason: "Trending in Society",
+  },
+  {
+    id: "8",
+    content: "Loneliness is not the absence of people. It's the presence of people who don't understand you. Some of the loneliest moments happen in crowded rooms.",
+    authorId: "anon4",
+    authorName: "Anonymous",
+    authorUsername: "",
+    postingMode: "Anonymous",
+    category: "Psychology",
+    appreciations: 2300,
+    disagreements: 12,
+    reposts: 678,
+    saves: 891,
+    comments: 234,
+    reportCount: 0,
+    qualityScore: 0,
+    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    isEdited: false,
+    hasAppreciated: false,
+    hasDisagreed: false,
+    hasSaved: false,
+    hasReposted: false,
+    hasReported: false,
+    type: "standard",
+    feedReason: "Highly discussed today",
+  },
+  {
+    id: "9",
+    content: "We built search engines to find information but never built the tools to evaluate it. Information abundance without epistemic infrastructure is just noise at scale.",
+    authorId: "si1",
+    authorName: "SilentAlgorithm",
+    authorUsername: "silentalgorithm",
+    postingMode: "Public",
+    category: "Technology",
+    appreciations: 678,
+    disagreements: 45,
+    reposts: 234,
+    saves: 156,
+    comments: 89,
+    reportCount: 0,
+    qualityScore: 0,
+    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+    isEdited: false,
+    hasAppreciated: false,
+    hasDisagreed: false,
+    hasSaved: false,
+    hasReposted: false,
+    hasReported: false,
+    type: "standard",
+    feedReason: "Trending in Technology",
+  },
 ];
+
+function seedWithScores(thoughts: Thought[]): Thought[] {
+  return thoughts.map(t => ({
+    ...t,
+    qualityScore: calculateQualityScore({
+      appreciations: t.appreciations,
+      comments: t.comments,
+      reposts: t.reposts,
+      saves: t.saves,
+      pollTotalVotes: t.poll?.totalVotes,
+      reportCount: t.reportCount,
+      createdAt: t.createdAt,
+    }),
+  }));
+}
 
 const SEED_NOTIFICATIONS: Notification[] = [
   {
     id: "n1",
     type: "appreciation",
-    actorName: "Vikram N.",
-    thoughtContent: "The most dangerous phrase in any organisation...",
-    createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+    actorName: "QuantumSage",
+    thoughtContent: "There's a peculiar comfort...",
+    createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
     read: false,
   },
   {
     id: "n2",
     type: "comment",
-    actorName: "Aryan Kapoor",
-    thoughtContent: "Your thought on rest and productivity",
+    actorName: "DeepDiver_88",
+    thoughtContent: "The saddest thing about...",
     createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     read: false,
   },
   {
     id: "n3",
     type: "follow",
-    actorName: "Priya S.",
-    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+    actorName: "CosmicDrift_07",
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     read: false,
   },
   {
     id: "n4",
     type: "badge",
     actorName: "overthinkers",
-    createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
-    read: true,
+    createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+    read: false,
   },
   {
     id: "n5",
     type: "repost",
-    actorName: "Meera T.",
-    thoughtContent: "AI will not replace human creativity...",
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    actorName: "Anonymous",
+    thoughtContent: "Loneliness is not the absence...",
+    createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
+    read: true,
+  },
+  {
+    id: "n6",
+    type: "appreciation",
+    actorName: "BlankCanvas_21",
+    thoughtContent: "The most dangerous phrase...",
+    createdAt: new Date(Date.now() - 10 * 60 * 60 * 1000).toISOString(),
     read: true,
   },
 ];
@@ -336,32 +463,88 @@ const SEED_COMMENTS: Record<string, Comment[]> = {
       depth: 0,
       hasAppreciated: false,
     },
+    {
+      id: "c5",
+      thoughtId: "2",
+      content: "The gap between knowing this and actually living it is enormous though.",
+      authorId: "anon5",
+      authorName: "Anonymous",
+      postingMode: "Anonymous",
+      appreciations: 112,
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      parentId: "c4",
+      depth: 1,
+      hasAppreciated: false,
+    },
+  ],
+  "8": [
+    {
+      id: "c6",
+      thoughtId: "8",
+      content: "I felt this at my own birthday party once. Surrounded by people who cared but didn't understand. The worst kind of alone.",
+      authorId: "anon6",
+      authorName: "Anonymous",
+      postingMode: "Anonymous",
+      appreciations: 567,
+      createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+      depth: 0,
+      hasAppreciated: false,
+    },
+    {
+      id: "c7",
+      thoughtId: "8",
+      content: "This is the only kind of loneliness no one talks about.",
+      authorId: "u8",
+      authorName: "NightOwl_23",
+      postingMode: "Public",
+      appreciations: 201,
+      createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+      parentId: "c6",
+      depth: 1,
+      hasAppreciated: false,
+    },
   ],
 };
 
 const defaultUser: AppUser = {
   id: "me",
-  username: "overthinker",
-  displayName: "You",
-  bio: "Still figuring it all out.",
-  reputation: 247,
-  badge: "Thinker",
-  followersCount: 43,
-  followingCount: 89,
-  thoughtsCount: 12,
+  username: "QuietMind_516",
+  displayName: "QuietMind_516",
+  bio: "Thinking in public, one thought at a time.",
+  reputation: 6,
+  badge: "Newcomer",
+  followersCount: 0,
+  followingCount: 3,
+  thoughtsCount: 0,
 };
+
+// ─── Context ─────────────────────────────────────────────────────────────────
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  THOUGHTS: "@overthinkers/thoughts",
-  COMMENTS: "@overthinkers/comments",
-  NOTIFICATIONS: "@overthinkers/notifications",
-  USER: "@overthinkers/user",
+  THOUGHTS: "@overthinkers/thoughts/v2",
+  COMMENTS: "@overthinkers/comments/v2",
+  NOTIFICATIONS: "@overthinkers/notifications/v2",
 };
 
+function recomputeScore(t: Thought): Thought {
+  return {
+    ...t,
+    qualityScore: calculateQualityScore({
+      appreciations: t.appreciations,
+      comments: t.comments,
+      reposts: t.reposts,
+      saves: t.saves,
+      pollTotalVotes: t.poll?.totalVotes,
+      reportCount: t.reportCount,
+      createdAt: t.createdAt,
+    }),
+  };
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [thoughts, setThoughts] = useState<Thought[]>(SEED_THOUGHTS);
+  const [thoughts, setThoughts] = useState<Thought[]>(() => seedWithScores(SEED_THOUGHTS));
   const [comments, setComments] = useState<Record<string, Comment[]>>(SEED_COMMENTS);
   const [notifications, setNotifications] = useState<Notification[]>(SEED_NOTIFICATIONS);
   const [currentUser] = useState<AppUser>(defaultUser);
@@ -390,7 +573,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try { await AsyncStorage.setItem(STORAGE_KEYS.COMMENTS, JSON.stringify(c)); } catch {}
   }, []);
 
-  const addThought = useCallback((thought: Omit<Thought, "id" | "createdAt" | "qualityScore" | "appreciations" | "disagreements" | "reposts" | "saves" | "comments" | "hasAppreciated" | "hasDisagreed" | "hasSaved" | "hasReposted">) => {
+  // ─── Thought CRUD ──────────────────────────────────────────────────────────
+
+  const addThought = useCallback((thought: Omit<Thought, "id" | "createdAt" | "qualityScore" | "appreciations" | "disagreements" | "reposts" | "saves" | "comments" | "reportCount" | "hasAppreciated" | "hasDisagreed" | "hasSaved" | "hasReposted" | "hasReported" | "isEdited" | "editedAt">) => {
     const newThought: Thought = {
       ...thought,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
@@ -401,10 +586,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reposts: 0,
       saves: 0,
       comments: 0,
+      reportCount: 0,
       hasAppreciated: false,
       hasDisagreed: false,
       hasSaved: false,
       hasReposted: false,
+      hasReported: false,
+      isEdited: false,
+      editedAt: undefined,
       feedReason: undefined,
     };
     setThoughts(prev => {
@@ -414,18 +603,50 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [saveThoughts]);
 
+  /**
+   * Section 67 — Thought editing with 30-minute window.
+   * Returns true if the edit succeeded, false if the window has expired.
+   */
+  const editThought = useCallback((thoughtId: string, newContent: string): boolean => {
+    let succeeded = false;
+    setThoughts(prev => {
+      const thought = prev.find(t => t.id === thoughtId);
+      if (!thought) return prev;
+      const ageMs = Date.now() - new Date(thought.createdAt).getTime();
+      if (ageMs > 30 * 60 * 1000) return prev; // outside 30-min window
+      succeeded = true;
+      const next = prev.map(t =>
+        t.id !== thoughtId ? t : { ...t, content: newContent, isEdited: true, editedAt: new Date().toISOString() }
+      );
+      saveThoughts(next);
+      return next;
+    });
+    return succeeded;
+  }, [saveThoughts]);
+
+  const deleteThought = useCallback((thoughtId: string) => {
+    setThoughts(prev => {
+      const next = prev.filter(t => t.id !== thoughtId);
+      saveThoughts(next);
+      return next;
+    });
+  }, [saveThoughts]);
+
+  // ─── Engagement Toggles ────────────────────────────────────────────────────
+
   const toggleAppreciate = useCallback((thoughtId: string) => {
     setThoughts(prev => {
       const next = prev.map(t => {
         if (t.id !== thoughtId) return t;
         const wasOn = t.hasAppreciated;
-        return {
+        const updated: Thought = {
           ...t,
           hasAppreciated: !wasOn,
           hasDisagreed: wasOn ? t.hasDisagreed : false,
           appreciations: wasOn ? t.appreciations - 1 : t.appreciations + 1,
           disagreements: !wasOn && t.hasDisagreed ? t.disagreements - 1 : t.disagreements,
         };
+        return recomputeScore(updated);
       });
       saveThoughts(next);
       return next;
@@ -437,13 +658,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const next = prev.map(t => {
         if (t.id !== thoughtId) return t;
         const wasOn = t.hasDisagreed;
-        return {
+        const updated: Thought = {
           ...t,
           hasDisagreed: !wasOn,
           hasAppreciated: wasOn ? t.hasAppreciated : false,
           disagreements: wasOn ? t.disagreements - 1 : t.disagreements + 1,
           appreciations: !wasOn && t.hasAppreciated ? t.appreciations - 1 : t.appreciations,
         };
+        return recomputeScore(updated);
       });
       saveThoughts(next);
       return next;
@@ -452,13 +674,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const toggleSave = useCallback((thoughtId: string) => {
     setThoughts(prev => {
-      const next = prev.map(t =>
-        t.id !== thoughtId ? t : {
+      const next = prev.map(t => {
+        if (t.id !== thoughtId) return t;
+        const updated: Thought = {
           ...t,
           hasSaved: !t.hasSaved,
           saves: t.hasSaved ? t.saves - 1 : t.saves + 1,
-        }
-      );
+        };
+        return recomputeScore(updated);
+      });
       saveThoughts(next);
       return next;
     });
@@ -466,13 +690,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const toggleRepost = useCallback((thoughtId: string) => {
     setThoughts(prev => {
-      const next = prev.map(t =>
-        t.id !== thoughtId ? t : {
+      const next = prev.map(t => {
+        if (t.id !== thoughtId) return t;
+        const updated: Thought = {
           ...t,
           hasReposted: !t.hasReposted,
           reposts: t.hasReposted ? t.reposts - 1 : t.reposts + 1,
-        }
-      );
+        };
+        return recomputeScore(updated);
+      });
+      saveThoughts(next);
+      return next;
+    });
+  }, [saveThoughts]);
+
+  /**
+   * Section 37 — Report a thought.
+   * Increments reportCount and recomputes Quality Score (reports carry -10 penalty).
+   * Auto-hide threshold of 5 reports is handled by the Quality Score dropping below zero.
+   */
+  const reportThought = useCallback((thoughtId: string) => {
+    setThoughts(prev => {
+      const next = prev.map(t => {
+        if (t.id !== thoughtId || t.hasReported) return t;
+        const updated: Thought = {
+          ...t,
+          hasReported: true,
+          reportCount: t.reportCount + 1,
+        };
+        return recomputeScore(updated);
+      });
       saveThoughts(next);
       return next;
     });
@@ -486,20 +733,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ...opt,
           votes: i === optionIndex ? opt.votes + 1 : opt.votes,
         }));
-        return {
-          ...t,
-          poll: {
-            ...t.poll,
-            options: newOptions,
-            totalVotes: t.poll.totalVotes + 1,
-            userVote: optionIndex,
-          },
+        const updatedPoll = {
+          ...t.poll,
+          options: newOptions,
+          totalVotes: t.poll.totalVotes + 1,
+          userVote: optionIndex,
         };
+        return recomputeScore({ ...t, poll: updatedPoll });
       });
       saveThoughts(next);
       return next;
     });
   }, [saveThoughts]);
+
+  // ─── Comments ──────────────────────────────────────────────────────────────
 
   const addComment = useCallback((comment: Omit<Comment, "id" | "createdAt" | "appreciations" | "hasAppreciated">) => {
     const newComment: Comment = {
@@ -518,11 +765,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
     setThoughts(prev => {
-      const next = prev.map(t => t.id !== comment.thoughtId ? t : { ...t, comments: t.comments + 1 });
+      const next = prev.map(t => {
+        if (t.id !== comment.thoughtId) return t;
+        const updated = { ...t, comments: t.comments + 1 };
+        return recomputeScore(updated);
+      });
       saveThoughts(next);
       return next;
     });
   }, [saveComments, saveThoughts]);
+
+  /** Section 20 — Comment appreciation toggle. */
+  const toggleCommentAppreciate = useCallback((thoughtId: string, commentId: string) => {
+    setComments(prev => {
+      const threadComments = prev[thoughtId] || [];
+      const next = {
+        ...prev,
+        [thoughtId]: threadComments.map(c => {
+          if (c.id !== commentId) return c;
+          return {
+            ...c,
+            hasAppreciated: !c.hasAppreciated,
+            appreciations: c.hasAppreciated ? c.appreciations - 1 : c.appreciations + 1,
+          };
+        }),
+      };
+      saveComments(next);
+      return next;
+    });
+  }, [saveComments]);
+
+  // ─── Notifications ─────────────────────────────────────────────────────────
 
   const markAllRead = useCallback(() => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
@@ -533,8 +806,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   return (
     <AppContext.Provider value={{
       thoughts, comments, notifications, currentUser, unreadCount,
-      addThought, toggleAppreciate, toggleDisagree, toggleSave, toggleRepost,
-      votePoll, addComment, markAllRead,
+      addThought, editThought, deleteThought,
+      toggleAppreciate, toggleDisagree, toggleSave, toggleRepost, reportThought,
+      votePoll, addComment, toggleCommentAppreciate, markAllRead,
     }}>
       {children}
     </AppContext.Provider>

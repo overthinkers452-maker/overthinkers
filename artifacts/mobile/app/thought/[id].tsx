@@ -7,24 +7,35 @@ import {
   TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
+  Alert,
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLocalSearchParams, Stack } from "expo-router";
+import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/useColors";
 import { useApp, Thought, Comment, PostingMode } from "@/context/AppContext";
 import { ThoughtCard } from "@/components/ThoughtCard";
-import { formatCount, timeAgo } from "@/utils/format";
+import { formatCount, timeAgo, withinEditWindow } from "@/utils/format";
+
+type CommentRow = Comment & { isReply?: boolean };
 
 export default function ThoughtDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { thoughts, comments, addComment, currentUser } = useApp();
+  const router = useRouter();
+  const { thoughts, comments, addComment, toggleCommentAppreciate, editThought, currentUser } = useApp();
+
   const [replyText, setReplyText] = useState("");
   const [replyMode, setReplyMode] = useState<PostingMode>("Public");
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [replyingToName, setReplyingToName] = useState<string | null>(null);
+
+  // Edit mode state
+  const [editContent, setEditContent] = useState("");
+  const [isEditing, setIsEditing] = useState(edit === "1");
 
   const thought = thoughts.find(t => t.id === id);
   const threadComments = (comments[id!] || []).filter(c => !c.parentId);
@@ -34,24 +45,61 @@ export default function ThoughtDetailScreen() {
 
   if (!thought) {
     return (
-      <View style={[styles.container, styles.centered]}>
+      <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
         <Text style={{ color: colors.mutedForeground }}>Thought not found.</Text>
       </View>
     );
   }
 
+  const isOwnThought = thought.authorId === currentUser.id;
+  const canEdit = isOwnThought && withinEditWindow(thought.createdAt);
+
   const onSubmitComment = () => {
     if (!replyText.trim()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const parentComment = replyingToId ? (comments[id!] || []).find(c => c.id === replyingToId) : null;
+    const depth = parentComment ? Math.min(parentComment.depth + 1, 2) : 0;
+
     addComment({
       thoughtId: id!,
       content: replyText.trim(),
       authorId: currentUser.id,
       authorName: currentUser.displayName,
       postingMode: replyMode,
-      alias: replyMode === "Pseudonymous" ? currentUser.displayName.split(" ")[0] : undefined,
-      depth: 0,
+      alias: replyMode === "Pseudonymous" ? currentUser.displayName.split("_")[0] : undefined,
+      parentId: replyingToId || undefined,
+      depth,
     });
+    setReplyText("");
+    setReplyingToId(null);
+    setReplyingToName(null);
+  };
+
+  const onStartEdit = () => {
+    setEditContent(thought.content);
+    setIsEditing(true);
+  };
+
+  const onSaveEdit = () => {
+    if (!editContent.trim() || editContent.trim() === thought.content) {
+      setIsEditing(false);
+      return;
+    }
+    const succeeded = editThought(thought.id, editContent.trim());
+    if (!succeeded) {
+      Alert.alert("Edit window closed", "Thoughts can only be edited within 30 minutes of posting.");
+    }
+    setIsEditing(false);
+  };
+
+  const onStartReply = (comment: Comment) => {
+    const display =
+      comment.postingMode === "Anonymous" ? "Anonymous"
+      : comment.postingMode === "Pseudonymous" ? (comment.alias || "Anonymous")
+      : comment.authorName;
+    setReplyingToId(comment.id);
+    setReplyingToName(display);
     setReplyText("");
   };
 
@@ -60,11 +108,15 @@ export default function ThoughtDetailScreen() {
     : replyMode === "Pseudonymous" ? colors.pseudonymousMode
     : colors.anonymousMode;
 
+  const cycleMode = () => {
+    setReplyMode(m => m === "Public" ? "Pseudonymous" : m === "Pseudonymous" ? "Anonymous" : "Public");
+  };
+
   const renderComment = ({ item: comment }: { item: Comment }) => {
     const replies = getReplies(comment.id);
     const authorDisplay =
       comment.postingMode === "Anonymous" ? "Anonymous"
-      : comment.postingMode === "Pseudonymous" ? comment.alias || "Anonymous"
+      : comment.postingMode === "Pseudonymous" ? (comment.alias || "Anonymous")
       : comment.authorName;
     const cModeColor =
       comment.postingMode === "Public" ? colors.publicMode
@@ -73,7 +125,7 @@ export default function ThoughtDetailScreen() {
 
     return (
       <View>
-        <View style={[styles.comment, { marginLeft: comment.depth * 20 }]}>
+        <View style={styles.comment}>
           <View style={[styles.commentAvatar, { backgroundColor: cModeColor + "20" }]}>
             <Text style={[styles.commentAvatarText, { color: cModeColor }]}>
               {comment.postingMode === "Anonymous" ? "?" : authorDisplay.charAt(0).toUpperCase()}
@@ -86,9 +138,30 @@ export default function ThoughtDetailScreen() {
             </View>
             <Text style={styles.commentText}>{comment.content}</Text>
             <View style={styles.commentActions}>
-              <TouchableOpacity style={styles.commentAction} activeOpacity={0.7}>
-                <Feather name="arrow-up" size={14} color={comment.hasAppreciated ? colors.appreciate : colors.mutedForeground} />
-                <Text style={styles.commentActionText}>{formatCount(comment.appreciations)}</Text>
+              <TouchableOpacity
+                style={styles.commentAction}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  toggleCommentAppreciate(id!, comment.id);
+                }}
+                activeOpacity={0.7}
+              >
+                <Feather
+                  name="heart"
+                  size={13}
+                  color={comment.hasAppreciated ? colors.appreciate : colors.mutedForeground}
+                />
+                <Text style={[styles.commentActionText, comment.hasAppreciated && { color: colors.appreciate }]}>
+                  {formatCount(comment.appreciations)}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.commentAction}
+                onPress={() => onStartReply(comment)}
+                activeOpacity={0.7}
+              >
+                <Feather name="corner-down-right" size={13} color={colors.mutedForeground} />
+                <Text style={styles.commentActionText}>Reply</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -97,7 +170,7 @@ export default function ThoughtDetailScreen() {
         {replies.map(reply => {
           const rDisplay =
             reply.postingMode === "Anonymous" ? "Anonymous"
-            : reply.postingMode === "Pseudonymous" ? reply.alias || "Anonymous"
+            : reply.postingMode === "Pseudonymous" ? (reply.alias || "Anonymous")
             : reply.authorName;
           const rColor =
             reply.postingMode === "Public" ? colors.publicMode
@@ -105,8 +178,11 @@ export default function ThoughtDetailScreen() {
             : colors.anonymousMode;
 
           return (
-            <View key={reply.id} style={[styles.comment, { marginLeft: 40, borderLeftWidth: 2, borderLeftColor: colors.border, paddingLeft: 12 }]}>
-              <View style={[styles.commentAvatar, { backgroundColor: rColor + "20", width: 28, height: 28, borderRadius: 14 }]}>
+            <View
+              key={reply.id}
+              style={[styles.comment, styles.replyComment, { borderLeftColor: colors.border }]}
+            >
+              <View style={[styles.commentAvatar, styles.replyAvatar, { backgroundColor: rColor + "20" }]}>
                 <Text style={[styles.commentAvatarText, { color: rColor, fontSize: 11 }]}>
                   {reply.postingMode === "Anonymous" ? "?" : rDisplay.charAt(0).toUpperCase()}
                 </Text>
@@ -117,6 +193,25 @@ export default function ThoughtDetailScreen() {
                   <Text style={styles.commentMeta}>{timeAgo(reply.createdAt)}</Text>
                 </View>
                 <Text style={styles.commentText}>{reply.content}</Text>
+                <View style={styles.commentActions}>
+                  <TouchableOpacity
+                    style={styles.commentAction}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      toggleCommentAppreciate(id!, reply.id);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Feather
+                      name="heart"
+                      size={13}
+                      color={reply.hasAppreciated ? colors.appreciate : colors.mutedForeground}
+                    />
+                    <Text style={[styles.commentActionText, reply.hasAppreciated && { color: colors.appreciate }]}>
+                      {formatCount(reply.appreciations)}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           );
@@ -134,6 +229,19 @@ export default function ThoughtDetailScreen() {
         headerStyle: { backgroundColor: colors.background } as any,
         headerTitleStyle: { fontFamily: "Inter_600SemiBold", color: colors.foreground } as any,
         headerTintColor: colors.primary,
+        headerRight: isOwnThought && !isEditing ? () => (
+          <TouchableOpacity
+            onPress={canEdit ? onStartEdit : () => Alert.alert("Edit window closed", "Thoughts can only be edited within 30 minutes of posting.")}
+            style={{ marginRight: 12, padding: 4 }}
+            activeOpacity={0.7}
+          >
+            <Feather name="edit-2" size={18} color={canEdit ? colors.primary : colors.mutedForeground} />
+          </TouchableOpacity>
+        ) : isEditing ? () => (
+          <TouchableOpacity onPress={onSaveEdit} style={{ marginRight: 12, padding: 4 }} activeOpacity={0.8}>
+            <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 15 }}>Save</Text>
+          </TouchableOpacity>
+        ) : undefined,
       }} />
 
       <KeyboardAvoidingView
@@ -141,58 +249,103 @@ export default function ThoughtDetailScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-        <FlatList
-          data={threadComments}
-          keyExtractor={item => item.id}
-          renderItem={renderComment}
-          scrollEnabled={!!threadComments.length}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <View>
-              <ThoughtCard thought={thought} showReason={false} />
-              <View style={styles.commentsDivider}>
-                <Text style={styles.commentsLabel}>{thought.comments} comments</Text>
-              </View>
-            </View>
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyComments}>
-              <Feather name="message-circle" size={28} color={colors.mutedForeground} />
-              <Text style={styles.emptyText}>No comments yet. Be the first to respond.</Text>
-            </View>
-          }
-        />
-
-        <View style={[styles.inputBar, { borderTopColor: colors.border, paddingBottom: bottomPad + 8 }]}>
-          <TouchableOpacity
-            onPress={() => setReplyMode(m => m === "Public" ? "Pseudonymous" : m === "Pseudonymous" ? "Anonymous" : "Public")}
-            style={[styles.modeToggle, { borderColor: modeColor + "50", backgroundColor: modeColor + "15" }]}
-            activeOpacity={0.8}
-          >
-            <Feather
-              name={replyMode === "Public" ? "globe" : replyMode === "Pseudonymous" ? "user" : "eye-off"}
-              size={14}
-              color={modeColor}
+        {isEditing ? (
+          <View style={[styles.editContainer, { backgroundColor: colors.background }]}>
+            <Text style={[styles.editLabel, { color: colors.mutedForeground }]}>
+              Editing · {500 - editContent.length} chars remaining
+            </Text>
+            <TextInput
+              style={[styles.editInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]}
+              value={editContent}
+              onChangeText={setEditContent}
+              multiline
+              autoFocus
+              maxLength={500}
+              textAlignVertical="top"
             />
-          </TouchableOpacity>
-          <TextInput
-            style={[styles.replyInput, { borderColor: colors.border, backgroundColor: colors.secondary, color: colors.foreground }]}
-            placeholder="Reply thoughtfully..."
-            placeholderTextColor={colors.mutedForeground}
-            value={replyText}
-            onChangeText={setReplyText}
-            multiline
-            maxLength={500}
+            <TouchableOpacity
+              onPress={() => setIsEditing(false)}
+              style={styles.cancelEditBtn}
+              activeOpacity={0.7}
+            >
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 14 }}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
+            data={threadComments}
+            keyExtractor={item => item.id}
+            renderItem={renderComment}
+            scrollEnabled={!!threadComments.length}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <View>
+                <ThoughtCard thought={thought} showReason={false} />
+                <View style={[styles.commentsDivider, { borderBottomColor: colors.border, backgroundColor: colors.secondary }]}>
+                  <Text style={[styles.commentsLabel, { color: colors.mutedForeground }]}>
+                    {thought.comments} {thought.comments === 1 ? "comment" : "comments"}
+                  </Text>
+                </View>
+              </View>
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyComments}>
+                <Feather name="message-circle" size={28} color={colors.mutedForeground} />
+                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                  No comments yet. Be the first to respond.
+                </Text>
+              </View>
+            }
           />
-          <TouchableOpacity
-            onPress={onSubmitComment}
-            disabled={!replyText.trim()}
-            style={[styles.sendBtn, { backgroundColor: replyText.trim() ? colors.primary : colors.muted }]}
-            activeOpacity={0.8}
-          >
-            <Feather name="send" size={15} color={replyText.trim() ? colors.primaryForeground : colors.mutedForeground} />
-          </TouchableOpacity>
-        </View>
+        )}
+
+        {!isEditing && (
+          <View style={[styles.inputBar, { borderTopColor: colors.border, paddingBottom: bottomPad + 8, backgroundColor: colors.background }]}>
+            {replyingToId && (
+              <View style={[styles.replyBanner, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "30" }]}>
+                <Feather name="corner-down-right" size={12} color={colors.primary} />
+                <Text style={[styles.replyBannerText, { color: colors.primary }]}>
+                  Replying to {replyingToName}
+                </Text>
+                <TouchableOpacity onPress={() => { setReplyingToId(null); setReplyingToName(null); }}>
+                  <Feather name="x" size={13} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+            )}
+            <View style={styles.inputRow}>
+              <TouchableOpacity
+                onPress={cycleMode}
+                style={[styles.modeToggle, { borderColor: modeColor + "50", backgroundColor: modeColor + "15" }]}
+                activeOpacity={0.8}
+              >
+                <Feather
+                  name={replyMode === "Public" ? "globe" : replyMode === "Pseudonymous" ? "user" : "eye-off"}
+                  size={14}
+                  color={modeColor}
+                />
+              </TouchableOpacity>
+              <TextInput
+                style={[styles.replyInput, { borderColor: colors.border, backgroundColor: colors.secondary, color: colors.foreground }]}
+                placeholder={replyingToId ? `Reply to ${replyingToName}...` : "Reply thoughtfully..."}
+                placeholderTextColor={colors.mutedForeground}
+                value={replyText}
+                onChangeText={setReplyText}
+                multiline
+                maxLength={500}
+              />
+              <TouchableOpacity
+                onPress={onSubmitComment}
+                disabled={!replyText.trim()}
+                style={[styles.sendBtn, { backgroundColor: replyText.trim() ? colors.primary : colors.muted }]}
+                activeOpacity={0.8}
+              >
+                <Feather name="send" size={15} color={replyText.trim() ? colors.primaryForeground : colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </>
   );
@@ -203,79 +356,81 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     container: { flex: 1 },
     centered: { alignItems: "center", justifyContent: "center" },
     commentsDivider: {
-      paddingHorizontal: 16,
-      paddingVertical: 10,
+      paddingHorizontal: 16, paddingVertical: 10,
       borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      backgroundColor: colors.secondary,
     },
     commentsLabel: {
-      fontSize: 13,
-      fontFamily: "Inter_600SemiBold",
-      color: colors.mutedForeground,
-      textTransform: "uppercase",
-      letterSpacing: 0.8,
+      fontSize: 13, fontFamily: "Inter_600SemiBold",
+      textTransform: "uppercase", letterSpacing: 0.8,
     },
     comment: {
-      flexDirection: "row",
-      gap: 10,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
+      flexDirection: "row", gap: 10,
+      paddingHorizontal: 16, paddingVertical: 12,
+      borderBottomWidth: 1, borderBottomColor: colors.border,
+    },
+    replyComment: {
+      marginLeft: 24,
+      borderLeftWidth: 2,
+      paddingLeft: 12,
+      paddingHorizontal: 12,
     },
     commentAvatar: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      alignItems: "center",
-      justifyContent: "center",
-      flexShrink: 0,
+      width: 32, height: 32, borderRadius: 16,
+      alignItems: "center", justifyContent: "center", flexShrink: 0,
     },
+    replyAvatar: { width: 26, height: 26, borderRadius: 13 },
     commentAvatarText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
     commentContent: { flex: 1 },
     commentHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 },
     commentAuthor: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground },
     commentMeta: { fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular" },
     commentText: { fontSize: 14, lineHeight: 20, color: colors.foreground, fontFamily: "Inter_400Regular" },
-    commentActions: { flexDirection: "row", marginTop: 6, gap: 12 },
+    commentActions: { flexDirection: "row", marginTop: 6, gap: 16 },
     commentAction: { flexDirection: "row", alignItems: "center", gap: 4 },
     commentActionText: { fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular" },
     emptyComments: { paddingTop: 48, alignItems: "center", gap: 8, paddingHorizontal: 40 },
-    emptyText: { fontSize: 14, color: colors.mutedForeground, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
+    emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
     inputBar: {
-      flexDirection: "row",
-      alignItems: "flex-end",
-      paddingHorizontal: 12,
-      paddingTop: 10,
       borderTopWidth: 1,
-      gap: 8,
-      backgroundColor: colors.background,
+      paddingHorizontal: 12,
+      paddingTop: 8,
+    },
+    replyBanner: {
+      flexDirection: "row", alignItems: "center", gap: 6,
+      paddingHorizontal: 10, paddingVertical: 6,
+      borderRadius: 8, borderWidth: 1, marginBottom: 6,
+    },
+    replyBannerText: { flex: 1, fontSize: 12, fontFamily: "Inter_500Medium" },
+    inputRow: {
+      flexDirection: "row", alignItems: "flex-end", gap: 8,
     },
     modeToggle: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      borderWidth: 1,
-      alignItems: "center",
-      justifyContent: "center",
+      width: 36, height: 36, borderRadius: 18, borderWidth: 1,
+      alignItems: "center", justifyContent: "center",
     },
     replyInput: {
-      flex: 1,
-      borderWidth: 1,
-      borderRadius: 18,
-      paddingHorizontal: 14,
-      paddingVertical: 9,
-      fontSize: 14,
-      fontFamily: "Inter_400Regular",
-      maxHeight: 100,
+      flex: 1, borderWidth: 1, borderRadius: 18,
+      paddingHorizontal: 14, paddingVertical: 9,
+      fontSize: 14, fontFamily: "Inter_400Regular", maxHeight: 100,
     },
     sendBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      alignItems: "center",
-      justifyContent: "center",
+      width: 36, height: 36, borderRadius: 18,
+      alignItems: "center", justifyContent: "center",
+    },
+    editContainer: {
+      flex: 1, padding: 16, gap: 10,
+    },
+    editLabel: {
+      fontSize: 12, fontFamily: "Inter_500Medium",
+      textTransform: "uppercase", letterSpacing: 0.8,
+    },
+    editInput: {
+      flex: 1, borderWidth: 1, borderRadius: 12,
+      padding: 14, fontSize: 15, lineHeight: 22,
+      fontFamily: "Inter_400Regular",
+    },
+    cancelEditBtn: {
+      alignItems: "center", paddingVertical: 10,
     },
   });
 }

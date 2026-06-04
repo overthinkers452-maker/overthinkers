@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -21,41 +21,48 @@ type DiscoverTab = "Explore" | "Leaderboard";
 const TRENDING_SEARCHES = ["consciousness", "AI relationships", "free will", "loneliness", "identity"];
 
 const CATEGORIES_GRID = [
-  { name: "Psychology", count: 3 },
-  { name: "Society", count: 2 },
-  { name: "Relationships", count: 1 },
-  { name: "Tech", count: 3 },
-  { name: "Creativity", count: 1 },
-  { name: "Philosophy", count: 3 },
-  { name: "Culture", count: 1 },
-  { name: "Science", count: 1 },
-  { name: "Politics", count: 0 },
-  { name: "Health", count: 0 },
+  "Psychology", "Society", "Relationships", "Tech",
+  "Creativity", "Philosophy", "Culture", "Science", "Politics", "Health",
 ];
-
-const LEADERBOARD = [
-  { id: "lb1", initials: "DE", name: "DeepDiver_88", badge: "Elder", appreciated: 2103, rank: 1 },
-  { id: "lb2", initials: "BL", name: "BlankCanvas_...", badge: "Insightful", appreciated: 1234, rank: 2 },
-  { id: "lb3", initials: "CA", name: "CalmObserver", badge: "Insightful", appreciated: 1203, rank: 3 },
-  { id: "lb4", initials: "NI", name: "NightOwl_23", badge: "Insightful", appreciated: 789, rank: 4 },
-  { id: "lb5", initials: "CO", name: "CosmicDrift_07", badge: "Insightful", appreciated: 567, rank: 5 },
-  { id: "lb6", initials: "SI", name: "SilentAlgorithm", badge: "Insightful", appreciated: 678, rank: 6 },
-  { id: "lb7", initials: "DE2", name: "DeepSpaceThought_44", badge: "Thoughtful", appreciated: 567, rank: 7 },
-  { id: "lb8", initials: "ME", name: "Meridian_Fox", badge: "Thoughtful", appreciated: 445, rank: 8 },
-  { id: "lb9", initials: "QU", name: "QuantumSage", badge: "Thoughtful", appreciated: 342, rank: 9 },
-  { id: "lb10", initials: "VO", name: "VoidWatcher_99", badge: "Thoughtful", appreciated: 234, rank: 10 },
-  { id: "lb11", initials: "NE", name: "NeuralNomad_71", badge: "Thoughtful", appreciated: 234, rank: 11 },
-];
-
-const AVATAR_BG: Record<number, string> = {
-  1: "#C8F5D8", 2: "#C8D8FF", 3: "#E8C8FF",
-};
 
 const BADGE_COLORS: Record<string, string> = {
-  Elder: "#FBBF24",
+  Elder:      "#FBBF24",
   Insightful: "#C084FC",
   Thoughtful: "#818CF8",
+  Newcomer:   "#6EE7B7",
 };
+
+const AVATAR_BG_POOL = ["#C8F5D8", "#C8D8FF", "#E8C8FF", "#FFE8C8", "#C8FFEE", "#FFD8E8"];
+function avatarBg(index: number): string {
+  return AVATAR_BG_POOL[index % AVATAR_BG_POOL.length];
+}
+
+/** Section 32 — Leaderboard: rank non-anonymous authors by total appreciations */
+function buildLeaderboard(thoughts: ReturnType<typeof useApp>["thoughts"]) {
+  const totals: Record<string, { name: string; username: string; appreciated: number; badge: string }> = {};
+
+  for (const t of thoughts) {
+    if (t.postingMode === "Anonymous") continue;
+    const key = t.authorId;
+    const display = t.postingMode === "Pseudonymous" ? (t.alias || t.authorName) : t.authorName;
+    if (!totals[key]) {
+      totals[key] = { name: display, username: t.authorUsername, appreciated: 0, badge: "Newcomer" };
+    }
+    totals[key].appreciated += t.appreciations;
+  }
+
+  const sorted = Object.entries(totals)
+    .map(([id, v]) => ({ id, ...v }))
+    .sort((a, b) => b.appreciated - a.appreciated);
+
+  return sorted.map((entry, i) => {
+    let badge = "Newcomer";
+    if (entry.appreciated >= 2000) badge = "Elder";
+    else if (entry.appreciated >= 1000) badge = "Insightful";
+    else if (entry.appreciated >= 300) badge = "Thoughtful";
+    return { ...entry, rank: i + 1, badge };
+  });
+}
 
 export default function DiscoverScreen() {
   const colors = useColors();
@@ -63,26 +70,51 @@ export default function DiscoverScreen() {
   const { thoughts } = useApp();
   const [activeTab, setActiveTab] = useState<DiscoverTab>("Explore");
   const [search, setSearch] = useState("");
-  const [followedIds, setFollowedIds] = useState<Set<string>>(new Set(["lb4"]));
+  const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : 56 + insets.bottom;
 
-  const trendingThoughts = [...thoughts].sort((a, b) => b.appreciations - a.appreciations);
+  /** Section 32 — live leaderboard computed from AppContext thoughts */
+  const leaderboard = useMemo(() => buildLeaderboard(thoughts), [thoughts]);
+  const top3 = leaderboard.slice(0, 3);
+  const rest = leaderboard.slice(3);
+
+  const trendingThoughts = useMemo(
+    () => [...thoughts].sort((a, b) => b.qualityScore - a.qualityScore).slice(0, 4),
+    [thoughts]
+  );
+
+  /** Category grid: count thoughts per category */
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const t of thoughts) {
+      const key = t.category;
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    return counts;
+  }, [thoughts]);
+
+  const searchResults = useMemo(() => {
+    if (!search.trim()) return null;
+    const q = search.toLowerCase();
+    return thoughts.filter(t =>
+      t.content.toLowerCase().includes(q) ||
+      t.category.toLowerCase().includes(q) ||
+      t.authorName.toLowerCase().includes(q) ||
+      (t.alias || "").toLowerCase().includes(q)
+    );
+  }, [thoughts, search]);
 
   const toggleFollow = (id: string) => {
     setFollowedIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   };
 
   const styles = makeStyles(colors);
-
-  const top3 = LEADERBOARD.filter(u => u.rank <= 3);
-  const rest = LEADERBOARD.filter(u => u.rank > 3);
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
@@ -107,145 +139,190 @@ export default function DiscoverScreen() {
         )}
       </View>
 
-      <View style={styles.discoverTabBar}>
-        {(["Explore", "Leaderboard"] as DiscoverTab[]).map(tab => (
-          <TouchableOpacity
-            key={tab}
-            onPress={() => setActiveTab(tab)}
-            style={[styles.discoverTab, activeTab === tab && styles.discoverTabActive]}
-            activeOpacity={0.7}
-          >
-            <Feather
-              name={tab === "Explore" ? "compass" : "award"}
-              size={14}
-              color={activeTab === tab ? colors.primary : colors.mutedForeground}
-            />
-            <Text style={[styles.discoverTabText, activeTab === tab && styles.discoverTabTextActive]}>
-              {tab}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {searchResults ? (
+        <FlatList
+          data={searchResults}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => <ThoughtCard thought={item} showReason={false} />}
+          scrollEnabled={!!searchResults.length}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: bottomPad + 16 }}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Feather name="search" size={28} color={colors.mutedForeground} />
+              <Text style={styles.emptyText}>No results for "{search}"</Text>
+            </View>
+          }
+        />
+      ) : (
+        <>
+          <View style={styles.discoverTabBar}>
+            {(["Explore", "Leaderboard"] as DiscoverTab[]).map(tab => (
+              <TouchableOpacity
+                key={tab}
+                onPress={() => setActiveTab(tab)}
+                style={[styles.discoverTab, activeTab === tab && styles.discoverTabActive]}
+                activeOpacity={0.7}
+              >
+                <Feather
+                  name={tab === "Explore" ? "compass" : "award"}
+                  size={14}
+                  color={activeTab === tab ? colors.primary : colors.mutedForeground}
+                />
+                <Text style={[styles.discoverTabText, activeTab === tab && styles.discoverTabTextActive]}>
+                  {tab}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-      {activeTab === "Explore" ? (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: bottomPad + 16 }}>
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>TRENDING SEARCHES</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingRow}>
-              {TRENDING_SEARCHES.map(term => (
-                <TouchableOpacity
-                  key={term}
-                  onPress={() => setSearch(term)}
-                  style={styles.trendChip}
-                  activeOpacity={0.8}
-                >
-                  <Feather name="trending-up" size={12} color={colors.mutedForeground} />
-                  <Text style={styles.trendChipText}>{term}</Text>
-                </TouchableOpacity>
+          {activeTab === "Explore" ? (
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: bottomPad + 16 }}>
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>TRENDING SEARCHES</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingRow}>
+                  {TRENDING_SEARCHES.map(term => (
+                    <TouchableOpacity
+                      key={term}
+                      onPress={() => setSearch(term)}
+                      style={[styles.trendChip, { borderColor: colors.border, backgroundColor: colors.card }]}
+                      activeOpacity={0.8}
+                    >
+                      <Feather name="trending-up" size={12} color={colors.mutedForeground} />
+                      <Text style={[styles.trendChipText, { color: colors.foreground }]}>{term}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Categories</Text>
+                <View style={styles.categoriesGrid}>
+                  {CATEGORIES_GRID.map(cat => (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[styles.categoryCard, { borderColor: colors.border, backgroundColor: colors.card }]}
+                      activeOpacity={0.8}
+                      onPress={() => setSearch(cat)}
+                    >
+                      <Text style={[styles.categoryCardName, { color: colors.foreground }]}>{cat}</Text>
+                      <Text style={[styles.categoryCardCount, { color: colors.mutedForeground }]}>
+                        {categoryCounts[cat] || 0} thoughts
+                      </Text>
+                      <View style={[styles.categoryCardLine, { backgroundColor: colors.primary }]} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Trending Now</Text>
+              </View>
+              {trendingThoughts.map(t => (
+                <ThoughtCard key={t.id} thought={t} showReason={true} />
               ))}
             </ScrollView>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Categories</Text>
-            <View style={styles.categoriesGrid}>
-              {CATEGORIES_GRID.map(cat => (
-                <TouchableOpacity key={cat.name} style={[styles.categoryCard, { borderColor: colors.border, backgroundColor: colors.card }]} activeOpacity={0.8}>
-                  <Text style={styles.categoryCardName}>{cat.name}</Text>
-                  <Text style={styles.categoryCardCount}>{cat.count} thoughts</Text>
-                  <View style={[styles.categoryCardLine, { backgroundColor: colors.primary }]} />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Trending Now</Text>
-          </View>
-          {trendingThoughts.slice(0, 3).map(t => (
-            <ThoughtCard key={t.id} thought={t} showReason={true} />
-          ))}
-        </ScrollView>
-      ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: bottomPad + 16 }}>
-          <View style={styles.podium}>
-            <View style={styles.podiumSide}>
-              <View style={[styles.podiumAvatarSm, { backgroundColor: AVATAR_BG[2] || "#C8D8FF" }]}>
-                <Text style={styles.podiumInitialsSm}>{top3[1]?.initials.slice(0,2)}</Text>
-              </View>
-              <View style={[styles.rankBadgeSm, { backgroundColor: "#7A7A90" }]}>
-                <Text style={styles.rankBadgeText}>#2</Text>
-              </View>
-              <Text style={styles.podiumName} numberOfLines={1}>{top3[1]?.name}</Text>
-              <View style={[styles.podiumBadgeChip, { backgroundColor: BADGE_COLORS[top3[1]?.badge] + "30" }]}>
-                <Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[1]?.badge] }]}>{top3[1]?.badge}</Text>
-              </View>
-              <Text style={styles.podiumCount}>{formatCount(top3[1]?.appreciated || 0)} appreciated</Text>
-            </View>
-
-            <View style={styles.podiumCenter}>
-              <Text style={styles.podiumFirstLabel}>1st</Text>
-              <View style={[styles.podiumAvatarLg, { backgroundColor: AVATAR_BG[1] || "#C8F5D8" }]}>
-                <Text style={styles.podiumInitialsLg}>{top3[0]?.initials.slice(0,2)}</Text>
-              </View>
-              <View style={[styles.rankBadgeLg, { backgroundColor: "#F59E0B" }]}>
-                <Text style={styles.rankBadgeText}>#1</Text>
-              </View>
-              <Text style={[styles.podiumName, { fontFamily: "Inter_700Bold", fontSize: 14 }]}>{top3[0]?.name}</Text>
-              <View style={[styles.podiumBadgeChip, { backgroundColor: BADGE_COLORS[top3[0]?.badge] + "30" }]}>
-                <Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[0]?.badge] }]}>{top3[0]?.badge}</Text>
-              </View>
-              <Text style={styles.podiumCount}>{formatCount(top3[0]?.appreciated || 0)} appreciated</Text>
-            </View>
-
-            <View style={styles.podiumSide}>
-              <View style={[styles.podiumAvatarSm, { backgroundColor: AVATAR_BG[3] || "#E8C8FF" }]}>
-                <Text style={styles.podiumInitialsSm}>{top3[2]?.initials.slice(0,2)}</Text>
-              </View>
-              <View style={[styles.rankBadgeSm, { backgroundColor: "#9088CC" }]}>
-                <Text style={styles.rankBadgeText}>#3</Text>
-              </View>
-              <Text style={styles.podiumName} numberOfLines={1}>{top3[2]?.name}</Text>
-              <View style={[styles.podiumBadgeChip, { backgroundColor: BADGE_COLORS[top3[2]?.badge] + "30" }]}>
-                <Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[2]?.badge] }]}>{top3[2]?.badge}</Text>
-              </View>
-              <Text style={styles.podiumCount}>{formatCount(top3[2]?.appreciated || 0)} appreciated</Text>
-            </View>
-          </View>
-
-          {rest.map(user => {
-            const followed = followedIds.has(user.id);
-            return (
-              <View key={user.id} style={[styles.rankRow, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.rankNum, { color: colors.mutedForeground }]}>#{user.rank}</Text>
-                <View style={[styles.rankAvatar, { backgroundColor: colors.secondary }]}>
-                  <Text style={[styles.rankAvatarText, { color: colors.primary }]}>{user.initials.slice(0,2)}</Text>
-                </View>
-                <View style={styles.rankInfo}>
-                  <Text style={[styles.rankName, { color: colors.foreground }]} numberOfLines={1}>{user.name}</Text>
-                  <View style={styles.rankMeta}>
-                    <View style={[styles.rankBadgeChip, { backgroundColor: BADGE_COLORS[user.badge] + "25" }]}>
-                      <Text style={[styles.rankBadgeLabel, { color: BADGE_COLORS[user.badge] }]}>{user.badge}</Text>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: bottomPad + 16 }}>
+              {top3.length > 0 && (
+                <View style={[styles.podium, { borderBottomColor: colors.border }]}>
+                  {/* 2nd place */}
+                  {top3[1] ? (
+                    <View style={styles.podiumSide}>
+                      <View style={[styles.podiumAvatarSm, { backgroundColor: avatarBg(1) }]}>
+                        <Text style={styles.podiumInitialsSm}>{top3[1].name.slice(0, 2).toUpperCase()}</Text>
+                      </View>
+                      <View style={[styles.rankBadgeSm, { backgroundColor: "#7A7A90" }]}>
+                        <Text style={styles.rankBadgeText}>#2</Text>
+                      </View>
+                      <Text style={styles.podiumName} numberOfLines={1}>{top3[1].name}</Text>
+                      <View style={[styles.podiumBadgeChip, { backgroundColor: (BADGE_COLORS[top3[1].badge] || "#818CF8") + "30" }]}>
+                        <Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[1].badge] || "#818CF8" }]}>{top3[1].badge}</Text>
+                      </View>
+                      <Text style={[styles.podiumCount, { color: colors.mutedForeground }]}>{formatCount(top3[1].appreciated)} appreciated</Text>
                     </View>
-                    <Text style={[styles.rankCount, { color: colors.mutedForeground }]}>{formatCount(user.appreciated)} appreciated</Text>
+                  ) : <View style={styles.podiumSide} />}
+
+                  {/* 1st place */}
+                  <View style={styles.podiumCenter}>
+                    <Text style={[styles.podiumFirstLabel, { color: colors.foreground }]}>1st</Text>
+                    <View style={[styles.podiumAvatarLg, { backgroundColor: avatarBg(0) }]}>
+                      <Text style={styles.podiumInitialsLg}>{top3[0].name.slice(0, 2).toUpperCase()}</Text>
+                    </View>
+                    <View style={[styles.rankBadgeLg, { backgroundColor: "#F59E0B" }]}>
+                      <Text style={styles.rankBadgeText}>#1</Text>
+                    </View>
+                    <Text style={[styles.podiumName, { fontFamily: "Inter_700Bold", fontSize: 14, color: colors.foreground }]}>{top3[0].name}</Text>
+                    <View style={[styles.podiumBadgeChip, { backgroundColor: (BADGE_COLORS[top3[0].badge] || "#FBBF24") + "30" }]}>
+                      <Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[0].badge] || "#FBBF24" }]}>{top3[0].badge}</Text>
+                    </View>
+                    <Text style={[styles.podiumCount, { color: colors.mutedForeground }]}>{formatCount(top3[0].appreciated)} appreciated</Text>
                   </View>
+
+                  {/* 3rd place */}
+                  {top3[2] ? (
+                    <View style={styles.podiumSide}>
+                      <View style={[styles.podiumAvatarSm, { backgroundColor: avatarBg(2) }]}>
+                        <Text style={styles.podiumInitialsSm}>{top3[2].name.slice(0, 2).toUpperCase()}</Text>
+                      </View>
+                      <View style={[styles.rankBadgeSm, { backgroundColor: "#9088CC" }]}>
+                        <Text style={styles.rankBadgeText}>#3</Text>
+                      </View>
+                      <Text style={styles.podiumName} numberOfLines={1}>{top3[2].name}</Text>
+                      <View style={[styles.podiumBadgeChip, { backgroundColor: (BADGE_COLORS[top3[2].badge] || "#C084FC") + "30" }]}>
+                        <Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[2].badge] || "#C084FC" }]}>{top3[2].badge}</Text>
+                      </View>
+                      <Text style={[styles.podiumCount, { color: colors.mutedForeground }]}>{formatCount(top3[2].appreciated)} appreciated</Text>
+                    </View>
+                  ) : <View style={styles.podiumSide} />}
                 </View>
-                <TouchableOpacity
-                  onPress={() => toggleFollow(user.id)}
-                  style={[styles.followBtn, {
-                    backgroundColor: followed ? "transparent" : colors.primary,
-                    borderColor: followed ? colors.border : colors.primary,
-                  }]}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.followText, { color: followed ? colors.foreground : "#fff" }]}>
-                    {followed ? "Following" : "Follow"}
+              )}
+
+              {leaderboard.length === 0 && (
+                <View style={styles.emptyState}>
+                  <Feather name="award" size={28} color={colors.mutedForeground} />
+                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                    No public authors yet. The leaderboard populates as people post.
                   </Text>
-                </TouchableOpacity>
-              </View>
-            );
-          })}
-        </ScrollView>
+                </View>
+              )}
+
+              {rest.map(user => {
+                const followed = followedIds.has(user.id);
+                const badgeColor = BADGE_COLORS[user.badge] || "#818CF8";
+                return (
+                  <View key={user.id} style={[styles.rankRow, { borderBottomColor: colors.border }]}>
+                    <Text style={[styles.rankNum, { color: colors.mutedForeground }]}>#{user.rank}</Text>
+                    <View style={[styles.rankAvatar, { backgroundColor: avatarBg(user.rank) }]}>
+                      <Text style={[styles.rankAvatarText, { color: "#2D2D50" }]}>{user.name.slice(0, 2).toUpperCase()}</Text>
+                    </View>
+                    <View style={styles.rankInfo}>
+                      <Text style={[styles.rankName, { color: colors.foreground }]} numberOfLines={1}>{user.name}</Text>
+                      <View style={styles.rankMeta}>
+                        <View style={[styles.rankBadgeChip, { backgroundColor: badgeColor + "25" }]}>
+                          <Text style={[styles.rankBadgeLabel, { color: badgeColor }]}>{user.badge}</Text>
+                        </View>
+                        <Text style={[styles.rankCount, { color: colors.mutedForeground }]}>{formatCount(user.appreciated)} appreciated</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => toggleFollow(user.id)}
+                      style={[styles.followBtn, {
+                        backgroundColor: followed ? "transparent" : colors.primary,
+                        borderColor: followed ? colors.border : colors.primary,
+                      }]}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.followText, { color: followed ? colors.foreground : "#fff" }]}>
+                        {followed ? "Following" : "Follow"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          )}
+        </>
       )}
     </View>
   );
@@ -265,10 +342,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     },
     searchInput: { flex: 1, fontSize: 14, color: colors.foreground, fontFamily: "Inter_400Regular", padding: 0 },
     discoverTabBar: {
-      flexDirection: "row",
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      paddingHorizontal: 16,
+      flexDirection: "row", borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: 16,
     },
     discoverTab: {
       flexDirection: "row", alignItems: "center", gap: 6,
@@ -284,53 +358,33 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     trendingRow: { paddingBottom: 4, gap: 8 },
     trendChip: {
       flexDirection: "row", alignItems: "center", gap: 5,
-      borderWidth: 1, borderColor: colors.border, borderRadius: 20,
-      paddingHorizontal: 12, paddingVertical: 6,
-      backgroundColor: colors.card,
+      borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
     },
-    trendChipText: { fontSize: 13, color: colors.foreground, fontFamily: "Inter_400Regular" },
-    categoriesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-    categoryCard: {
-      width: "47%", borderWidth: 1, borderRadius: 10,
-      padding: 12, marginBottom: 0, overflow: "hidden",
-    },
-    categoryCardName: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground, marginBottom: 3 },
-    categoryCardCount: { fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular", marginBottom: 10 },
+    trendChipText: { fontSize: 13, fontFamily: "Inter_400Regular" },
+    categoriesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 4 },
+    categoryCard: { width: "47%", borderWidth: 1, borderRadius: 10, padding: 12, overflow: "hidden" },
+    categoryCardName: { fontSize: 14, fontFamily: "Inter_600SemiBold", marginBottom: 3 },
+    categoryCardCount: { fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 10 },
     categoryCardLine: { height: 3, width: 28, borderRadius: 2, marginTop: 4 },
     podium: {
       flexDirection: "row", alignItems: "flex-end",
       paddingHorizontal: 20, paddingTop: 24, paddingBottom: 16,
-      borderBottomWidth: 1, borderBottomColor: colors.border,
-      gap: 8,
+      borderBottomWidth: 1, gap: 8,
     },
     podiumCenter: { flex: 1, alignItems: "center" },
     podiumSide: { flex: 1, alignItems: "center", paddingTop: 20 },
-    podiumFirstLabel: { fontSize: 18, fontFamily: "Inter_700Bold", color: colors.foreground, marginBottom: 6 },
-    podiumAvatarLg: {
-      width: 80, height: 80, borderRadius: 40,
-      alignItems: "center", justifyContent: "center", marginBottom: 4,
-    },
-    podiumAvatarSm: {
-      width: 56, height: 56, borderRadius: 28,
-      alignItems: "center", justifyContent: "center", marginBottom: 4,
-    },
+    podiumFirstLabel: { fontSize: 18, fontFamily: "Inter_700Bold", marginBottom: 6 },
+    podiumAvatarLg: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+    podiumAvatarSm: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", marginBottom: 4 },
     podiumInitialsLg: { fontSize: 24, fontFamily: "Inter_700Bold", color: "#2D2D50" },
     podiumInitialsSm: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#2D2D50" },
-    rankBadgeLg: {
-      width: 24, height: 24, borderRadius: 12,
-      alignItems: "center", justifyContent: "center",
-      marginTop: -12, marginBottom: 4,
-    },
-    rankBadgeSm: {
-      width: 20, height: 20, borderRadius: 10,
-      alignItems: "center", justifyContent: "center",
-      marginTop: -10, marginBottom: 4,
-    },
+    rankBadgeLg: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", marginTop: -12, marginBottom: 4 },
+    rankBadgeSm: { width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center", marginTop: -10, marginBottom: 4 },
     rankBadgeText: { fontSize: 10, color: "#fff", fontFamily: "Inter_700Bold" },
-    podiumName: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.foreground, textAlign: "center", marginBottom: 3 },
+    podiumName: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#1A1A2E", textAlign: "center", marginBottom: 3 },
     podiumBadgeChip: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 3 },
     podiumBadgeText: { fontSize: 11, fontFamily: "Inter_500Medium" },
-    podiumCount: { fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_400Regular", textAlign: "center" },
+    podiumCount: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "center" },
     rankRow: {
       flexDirection: "row", alignItems: "center",
       paddingHorizontal: 16, paddingVertical: 12,
@@ -345,10 +399,9 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     rankBadgeChip: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
     rankBadgeLabel: { fontSize: 11, fontFamily: "Inter_500Medium" },
     rankCount: { fontSize: 12, fontFamily: "Inter_400Regular" },
-    followBtn: {
-      paddingHorizontal: 16, paddingVertical: 7,
-      borderRadius: 20, borderWidth: 1,
-    },
+    followBtn: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
     followText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+    emptyState: { paddingTop: 60, alignItems: "center", gap: 8, paddingHorizontal: 40 },
+    emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
   });
 }
