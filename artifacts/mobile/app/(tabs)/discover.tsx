@@ -66,7 +66,7 @@ export default function DiscoverScreen() {
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set(["lb4"]));
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 62;
+  const bottomPad = Platform.OS === "web" ? 84 : 56 + insets.bottom;
 
   const trendingThoughts = [...thoughts].sort((a, b) => b.appreciations - a.appreciations);
 
