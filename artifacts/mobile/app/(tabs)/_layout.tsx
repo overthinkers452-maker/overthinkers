@@ -27,6 +27,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "bell", selected: "bell.fill" }} />
         <Label>Alerts</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="latenight">
+        <Icon sf={{ default: "moon.stars", selected: "moon.stars.fill" }} />
+        <Label>1 AM</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person.circle", selected: "person.circle.fill" }} />
         <Label>Profile</Label>
@@ -60,9 +64,9 @@ function ClassicTabLayout() {
         headerShown: false,
         tabBarShowLabel: true,
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontFamily: "Inter_500Medium",
-          marginTop: 2,
+          marginTop: 1,
         },
         tabBarStyle: {
           position: "absolute",
@@ -92,9 +96,9 @@ function ClassicTabLayout() {
           title: "Feed",
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name={focused ? "house.fill" : "house"} tintColor={color} size={22} />
+              <SymbolView name={focused ? "house.fill" : "house"} tintColor={color} size={21} />
             ) : (
-              <Feather name="home" size={22} color={color} />
+              <Feather name="home" size={21} color={color} />
             ),
         }}
       />
@@ -104,9 +108,9 @@ function ClassicTabLayout() {
           title: "Discover",
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name={focused ? "safari.fill" : "safari"} tintColor={color} size={22} />
+              <SymbolView name={focused ? "safari.fill" : "safari"} tintColor={color} size={21} />
             ) : (
-              <Feather name="compass" size={22} color={color} />
+              <Feather name="compass" size={21} color={color} />
             ),
         }}
       />
@@ -117,22 +121,17 @@ function ClassicTabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <View>
               {isIOS ? (
-                <SymbolView name={focused ? "bell.fill" : "bell"} tintColor={color} size={22} />
+                <SymbolView name={focused ? "bell.fill" : "bell"} tintColor={color} size={21} />
               ) : (
-                <Feather name="bell" size={22} color={color} />
+                <Feather name="bell" size={21} color={color} />
               )}
               {unreadCount > 0 && (
                 <View style={{
                   position: "absolute",
-                  top: -4,
-                  right: -7,
+                  top: -4, right: -7,
                   backgroundColor: colors.disagree,
-                  borderRadius: 8,
-                  minWidth: 16,
-                  height: 16,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  paddingHorizontal: 3,
+                  borderRadius: 8, minWidth: 16, height: 16,
+                  alignItems: "center", justifyContent: "center", paddingHorizontal: 3,
                 }}>
                   <Text style={{ color: "#fff", fontSize: 10, fontFamily: "Inter_700Bold" }}>
                     {unreadCount > 9 ? "9+" : unreadCount}
@@ -144,14 +143,29 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="latenight"
+        options={{
+          title: "1 AM",
+          tabBarIcon: ({ color, focused }) =>
+            isIOS ? (
+              <SymbolView name={focused ? "moon.stars.fill" : "moon.stars"} tintColor={color} size={21} />
+            ) : (
+              <Text style={{ fontSize: 18, color: focused ? "#C4B5FD" : color }}>
+                {focused ? "🌙" : "🌑"}
+              </Text>
+            ),
+          tabBarActiveTintColor: "#C4B5FD",
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name={focused ? "person.circle.fill" : "person.circle"} tintColor={color} size={22} />
+              <SymbolView name={focused ? "person.circle.fill" : "person.circle"} tintColor={color} size={21} />
             ) : (
-              <Feather name="user" size={22} color={color} />
+              <Feather name="user" size={21} color={color} />
             ),
         }}
       />
