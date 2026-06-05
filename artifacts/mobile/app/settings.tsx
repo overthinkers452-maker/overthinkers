@@ -1,21 +1,28 @@
 import React, { useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Switch, Alert, Platform,
+  Switch, Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { Stack, useRouter } from "expo-router";
+import { Stack } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { useTheme, ThemeMode } from "@/context/ThemeContext";
 import { useApp } from "@/context/AppContext";
+import { useSettings, APP_LANGUAGES } from "@/context/SettingsContext";
+import { useModal } from "@/context/ModalContext";
 
 export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const { themeMode, setThemeMode } = useTheme();
   const { translateLang, setTranslateLang } = useApp();
+  const {
+    hapticsEnabled, setHapticsEnabled,
+    soundEnabled, setSoundEnabled,
+    appLanguage, setAppLanguage,
+  } = useSettings();
+  const modal = useModal();
 
   // Local state for toggleable settings (no backend yet — persisted in future)
   const [notifAppreciations, setNotifAppreciations] = useState(true);
@@ -94,6 +101,16 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Feedback & Sound */}
+        <Text style={styles.section}>Feedback & Sound</Text>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Row label="Haptic feedback" icon="zap" isSwitch value={hapticsEnabled} onPress={() => setHapticsEnabled(!hapticsEnabled)} />
+          <Row label="Sound effects" icon="volume-2" isSwitch value={soundEnabled} onPress={() => setSoundEnabled(!soundEnabled)} />
+          <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+            Both are off by default. Likes and follows always show a subtle visual animation.
+          </Text>
+        </View>
+
         {/* Notifications */}
         <Text style={styles.section}>Notifications</Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -108,27 +125,38 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Row label="Private account" icon="lock" isSwitch value={privateMode} onPress={() => setPrivateMode(v => !v)} />
           <Row label="Hide disagreement counts" icon="eye-off" isSwitch value={hideDisagrees} onPress={() => setHideDisagrees(v => !v)} />
-          <Row label="Blocked users" icon="slash" onPress={() => Alert.alert("Blocked users", "No blocked users yet.")} />
-          <Row label="Content filters" icon="filter" onPress={() => Alert.alert("Content filters", "Coming soon — filter categories from your feed.")} />
+          <Row label="Blocked users" icon="slash" onPress={() => modal.alert({ title: "Blocked users", message: "No blocked users yet." })} />
+          <Row label="Content filters" icon="filter" onPress={() => modal.alert({ title: "Content filters", message: "Coming soon — filter categories from your feed." })} />
         </View>
 
         {/* Security */}
         <Text style={styles.section}>Security</Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Row label="Two-factor authentication" icon="shield" isSwitch value={twoFactor} onPress={() => setTwoFactor(v => !v)} />
-          <Row label="Change password" icon="key" onPress={() => Alert.alert("Change password", "Password reset link sent to your email.")} />
-          <Row label="Active sessions" icon="smartphone" onPress={() => Alert.alert("Active sessions", "Only this device is currently active.")} />
-          <Row label="Login history" icon="clock" onPress={() => Alert.alert("Login history", "No suspicious activity detected.")} />
+          <Row label="Change password" icon="key" onPress={() => modal.alert({ title: "Change password", message: "Password reset link sent to your email." })} />
+          <Row label="Active sessions" icon="smartphone" onPress={() => modal.alert({ title: "Active sessions", message: "Only this device is currently active." })} />
+          <Row label="Login history" icon="clock" onPress={() => modal.alert({ title: "Login history", message: "No suspicious activity detected." })} />
         </View>
 
         {/* Language */}
         <Text style={styles.section}>Language & Content</Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Row label="App language" icon="globe" onPress={() => Alert.alert("App language", "English (India)\n\nMore languages coming soon.")} />
+          <Row
+            label={`App language: ${APP_LANGUAGES.find(l => l.code === appLanguage)?.label ?? "English"}`}
+            icon="globe"
+            onPress={() => modal.sheet({
+              title: "App language",
+              actions: APP_LANGUAGES.map(l => ({
+                label: l.label,
+                icon: appLanguage === l.code ? "check" : "circle",
+                onPress: () => setAppLanguage(l.code),
+              })),
+            })}
+          />
           <Row
             label={`Translation language: ${translateLang?.label ?? "None"}`}
             icon="type"
-            onPress={() => Alert.alert("Translation", "Tap the Translate button on any thought card to set your preferred language.")}
+            onPress={() => modal.alert({ title: "Translation", message: "Tap the Translate button on any thought card to set your preferred language." })}
           />
           {translateLang && (
             <TouchableOpacity onPress={() => setTranslateLang(null)} style={[styles.row, { borderBottomColor: colors.border }]}>
@@ -141,17 +169,17 @@ export default function SettingsScreen() {
         {/* Account */}
         <Text style={styles.section}>Account</Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Row label="Export my data" icon="download" onPress={() => Alert.alert("Export data", "A download link will be emailed to you within 24 hours.")} />
-          <Row label="Log out of other devices" icon="log-out" onPress={() => Alert.alert("Log out", "All other sessions have been terminated.")} />
-          <Row label="Delete account" icon="trash-2" danger onPress={() => Alert.alert("Delete account", "This will permanently delete all your thoughts and data. This cannot be undone.", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => Alert.alert("Account deletion", "Your account has been scheduled for deletion in 30 days.") }])} />
+          <Row label="Export my data" icon="download" onPress={() => modal.alert({ title: "Export data", message: "A download link will be emailed to you within 24 hours." })} />
+          <Row label="Log out of other devices" icon="log-out" onPress={() => modal.alert({ title: "Log out", message: "All other sessions have been terminated." })} />
+          <Row label="Delete account" icon="trash-2" danger onPress={() => modal.confirm({ title: "Delete account", message: "This will permanently delete all your thoughts and data. This cannot be undone.", confirmText: "Delete", destructive: true, onConfirm: () => modal.alert({ title: "Account deletion", message: "Your account has been scheduled for deletion in 30 days." }) })} />
         </View>
 
         {/* About */}
         <Text style={styles.section}>About</Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Row label="Privacy policy" icon="file-text" onPress={() => Alert.alert("Privacy Policy", "overthinkers.com/privacy")} />
-          <Row label="Terms of service" icon="book" onPress={() => Alert.alert("Terms", "overthinkers.com/terms")} />
-          <Row label="Send feedback" icon="mail" onPress={() => Alert.alert("Feedback", "feedback@overthinkers.com")} />
+          <Row label="Privacy policy" icon="file-text" onPress={() => modal.alert({ title: "Privacy Policy", message: "overthinkers.com/privacy" })} />
+          <Row label="Terms of service" icon="book" onPress={() => modal.alert({ title: "Terms", message: "overthinkers.com/terms" })} />
+          <Row label="Send feedback" icon="mail" onPress={() => modal.alert({ title: "Feedback", message: "feedback@overthinkers.com" })} />
           <View style={[styles.row, { borderBottomColor: "transparent" }]}>
             <Feather name="info" size={18} color={colors.mutedForeground} />
             <Text style={styles.rowLabel}>Version 1.0.0</Text>
@@ -175,5 +203,6 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
     rowLabel: { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular", color: colors.foreground },
     rowMeta: { fontSize: 13, fontFamily: "Inter_400Regular" },
+    hint: { fontSize: 12, fontFamily: "Inter_400Regular", paddingHorizontal: 16, paddingVertical: 12, lineHeight: 17 },
   });
 }

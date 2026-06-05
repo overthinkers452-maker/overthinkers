@@ -6,9 +6,6 @@ export function useColors() {
   const { themeMode } = useTheme();
   const systemScheme = useColorScheme();
   const effectiveScheme = themeMode === "auto" ? systemScheme : themeMode;
-  const palette =
-    effectiveScheme === "dark" && "dark" in colors
-      ? (colors as Record<string, typeof colors.light>).dark
-      : colors.light;
+  const palette = effectiveScheme === "dark" ? colors.dark : colors.light;
   return { ...palette, radius: colors.radius };
 }

@@ -1,0 +1,1 @@
+- [Metro phantom SyntaxError](metro-stale-cache.md) — Metro Babel parse error that tsc + standalone babel-parser can't reproduce = stale transform cache; clear metro cache + restart.

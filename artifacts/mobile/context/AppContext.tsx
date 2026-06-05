@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { calculateQualityScore } from "@/utils/format";
 
@@ -6,10 +6,12 @@ export type PostingMode = "Public" | "Pseudonymous" | "Anonymous";
 export type FeedType = "For You" | "Following" | "Trending" | "Latest";
 
 export interface PollOption { text: string; votes: number; }
+export type PollDuration = "24h" | "48h" | "7d" | "manual";
 export interface Poll {
   options: PollOption[];
-  duration: "24h" | "48h" | "7d";
-  expiresAt: string;
+  duration: PollDuration;
+  /** null when duration is "manual" (open until the author deletes the thought) */
+  expiresAt: string | null;
   totalVotes: number;
   userVote?: number;
 }
@@ -54,6 +56,7 @@ export interface Comment {
   content: string;
   authorId: string;
   authorName: string;
+  authorUsername?: string;
   postingMode: PostingMode;
   alias?: string;
   appreciations: number;
@@ -61,6 +64,8 @@ export interface Comment {
   parentId?: string;
   depth: number;
   hasAppreciated: boolean;
+  reportCount: number;
+  hasReported: boolean;
 }
 
 export interface Notification {
@@ -90,6 +95,31 @@ export interface AppUser {
   followersCount: number;
   followingCount: number;
   thoughtsCount: number;
+  avatarUri?: string;
+  bannerUri?: string;
+  /** ISO timestamp of the last username change — used to enforce the once-per-2-weeks limit */
+  usernameChangedAt?: string;
+}
+
+export interface ScheduledThought {
+  id: string;
+  content: string;
+  authorId: string;
+  authorName: string;
+  authorUsername: string;
+  /** ISO timestamp when this will auto-publish to the 1 AM Feed */
+  publishAt: string;
+  createdAt: string;
+}
+
+export type ReportResult = { ok: boolean; message: string };
+
+export interface ProfileUpdate {
+  displayName?: string;
+  username?: string;
+  bio?: string;
+  avatarUri?: string | null;
+  bannerUri?: string | null;
 }
 
 export interface TranslateLang { code: string; label: string; }
@@ -110,6 +140,8 @@ interface AppContextType {
   addFleetingThought: (content: string) => void;
   followedUsers: Set<string>;
   toggleFollowUser: (userId: string) => void;
+  updateProfile: (update: ProfileUpdate) => ReportResult;
+  canChangeUsername: () => { allowed: boolean; nextChangeAt?: string };
   addThought: (thought: Omit<Thought, "id"|"createdAt"|"qualityScore"|"appreciations"|"disagreements"|"reposts"|"saves"|"comments"|"reportCount"|"hasAppreciated"|"hasDisagreed"|"hasSaved"|"hasReposted"|"hasReported"|"isEdited"|"editedAt"|"isRepost"|"originalAuthorName"|"originalAuthorId">) => void;
   editThought: (thoughtId: string, newContent: string) => boolean;
   deleteThought: (thoughtId: string) => void;
@@ -117,10 +149,15 @@ interface AppContextType {
   toggleDisagree: (thoughtId: string) => void;
   toggleSave: (thoughtId: string) => void;
   toggleRepost: (thoughtId: string) => void;
-  reportThought: (thoughtId: string) => void;
+  reportThought: (thoughtId: string, reason: string, description?: string) => ReportResult;
   votePoll: (thoughtId: string, optionIndex: number) => void;
-  addComment: (comment: Omit<Comment, "id"|"createdAt"|"appreciations"|"hasAppreciated">) => void;
+  addComment: (comment: Omit<Comment, "id"|"createdAt"|"appreciations"|"hasAppreciated"|"reportCount"|"hasReported">) => void;
   toggleCommentAppreciate: (thoughtId: string, commentId: string) => void;
+  reportComment: (thoughtId: string, commentId: string, reason: string, description?: string) => ReportResult;
+  scheduledThoughts: ScheduledThought[];
+  scheduleNightThought: (content: string) => ScheduledThought;
+  editScheduledThought: (id: string, content: string) => void;
+  deleteScheduledThought: (id: string) => void;
   markAllRead: () => void;
 }
 
@@ -236,7 +273,15 @@ const SEED_NOTIFICATIONS: Notification[] = [
   { id: "n6", type: "appreciation", actorName: "BlankCanvas_21", thoughtContent: "The most dangerous phrase...", createdAt: new Date(Date.now() - 36000000).toISOString(), read: true },
 ];
 
-const SEED_COMMENTS: Record<string, Comment[]> = {
+function normalizeSeedComments(raw: Record<string, Omit<Comment, "reportCount" | "hasReported">[]>): Record<string, Comment[]> {
+  const out: Record<string, Comment[]> = {};
+  for (const k of Object.keys(raw)) {
+    out[k] = raw[k].map(c => ({ ...c, reportCount: 0, hasReported: false }));
+  }
+  return out;
+}
+
+const SEED_COMMENTS: Record<string, Comment[]> = normalizeSeedComments({
   "1": [
     { id: "c1", thoughtId: "1", content: "This cuts deep. Every stagnant team I've ever worked on had this phrase as its unofficial motto.", authorId: "u6", authorName: "Rahul D.", postingMode: "Public", appreciations: 234, createdAt: new Date(Date.now() - 3600000).toISOString(), depth: 0, hasAppreciated: false },
     { id: "c2", thoughtId: "1", content: "Counter: sometimes 'we've always done it this way' means 'we spent years figuring this out.' Context matters.", authorId: "anon3", authorName: "Anonymous", postingMode: "Anonymous", appreciations: 178, createdAt: new Date(Date.now() - 5400000).toISOString(), depth: 0, hasAppreciated: false },
@@ -250,7 +295,7 @@ const SEED_COMMENTS: Record<string, Comment[]> = {
     { id: "c6", thoughtId: "8", content: "I felt this at my own birthday party once. Surrounded by people who cared but didn't understand.", authorId: "anon6", authorName: "Anonymous", postingMode: "Anonymous", appreciations: 567, createdAt: new Date(Date.now() - 3600000).toISOString(), depth: 0, hasAppreciated: false },
     { id: "c7", thoughtId: "8", content: "This is the only kind of loneliness no one talks about.", authorId: "u8", authorName: "NightOwl_23", postingMode: "Public", appreciations: 201, createdAt: new Date(Date.now() - 1800000).toISOString(), parentId: "c6", depth: 1, hasAppreciated: false },
   ],
-};
+});
 
 const defaultUser: AppUser = {
   id: "me", username: "QuietMind_516", displayName: "QuietMind_516",
@@ -272,7 +317,15 @@ const KEYS = {
   LANG: "@overthinkers/translateLang",
   FLEETING: "@overthinkers/fleeting",
   FOLLOWED: "@overthinkers/followedUsers",
+  USER: "@overthinkers/currentUser/v1",
+  SCHEDULED: "@overthinkers/scheduledNight/v1",
+  REPORTLOG: "@overthinkers/reportLog/v1",
 };
+
+const USERNAME_COOLDOWN_MS = 14 * 24 * 3600000; // once per 2 weeks
+const REPORT_RATE_WINDOW_MS = 3600000; // 1 hour
+const REPORT_RATE_MAX = 5; // max reports per hour
+const COMMENT_AUTOHIDE_THRESHOLD = 3; // community auto-hide
 
 function recomputeScore(t: Thought): Thought {
   return { ...t, qualityScore: calculateQualityScore({ appreciations: t.appreciations, comments: t.comments, reposts: t.reposts, saves: t.saves, pollTotalVotes: t.poll?.totalVotes, reportCount: t.reportCount, createdAt: t.createdAt }) };
@@ -282,17 +335,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [thoughts, setThoughts] = useState<Thought[]>(SEED_THOUGHTS);
   const [comments, setComments] = useState<Record<string, Comment[]>>(SEED_COMMENTS);
   const [notifications, setNotifications] = useState<Notification[]>(SEED_NOTIFICATIONS);
-  const [currentUser] = useState<AppUser>(defaultUser);
+  const [currentUser, setCurrentUser] = useState<AppUser>(defaultUser);
   const [moodEmoji, setMoodEmojiState] = useState("💭");
   const [bannerColor, setBannerColorState] = useState("#5B5BD6");
   const [translateLang, setTranslateLangState] = useState<TranslateLang | null>(null);
   const [fleetingThoughts, setFleetingThoughts] = useState<FleetingThought[]>([]);
   const [followedUsers, setFollowedUsers] = useState<Set<string>>(new Set(["u4", "u5"]));
+  const [scheduledThoughts, setScheduledThoughts] = useState<ScheduledThought[]>([]);
+  const reportLog = useRef<number[]>([]);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [t, c, n, mood, banner, lang, fl, followed] = await Promise.all([
+        const [t, c, n, mood, banner, lang, fl, followed, user, sched, rlog] = await Promise.all([
           AsyncStorage.getItem(KEYS.THOUGHTS),
           AsyncStorage.getItem(KEYS.COMMENTS),
           AsyncStorage.getItem(KEYS.NOTIFICATIONS),
@@ -301,6 +356,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(KEYS.LANG),
           AsyncStorage.getItem(KEYS.FLEETING),
           AsyncStorage.getItem(KEYS.FOLLOWED),
+          AsyncStorage.getItem(KEYS.USER),
+          AsyncStorage.getItem(KEYS.SCHEDULED),
+          AsyncStorage.getItem(KEYS.REPORTLOG),
         ]);
         if (t) setThoughts(JSON.parse(t));
         if (c) setComments(JSON.parse(c));
@@ -314,6 +372,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setFleetingThoughts(parsed.filter(f => new Date(f.expiresAt).getTime() > now));
         }
         if (followed) setFollowedUsers(new Set(JSON.parse(followed)));
+        if (user) setCurrentUser({ ...defaultUser, ...JSON.parse(user) });
+        if (sched) setScheduledThoughts(JSON.parse(sched));
+        if (rlog) reportLog.current = JSON.parse(rlog);
       } catch {}
     };
     load();
@@ -364,6 +425,99 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, []);
+
+  // ─── Profile editing ─────────────────────────────────────────────────────────
+
+  const canChangeUsername = useCallback((): { allowed: boolean; nextChangeAt?: string } => {
+    if (!currentUser.usernameChangedAt) return { allowed: true };
+    const last = new Date(currentUser.usernameChangedAt).getTime();
+    const elapsed = Date.now() - last;
+    if (elapsed >= USERNAME_COOLDOWN_MS) return { allowed: true };
+    return { allowed: false, nextChangeAt: new Date(last + USERNAME_COOLDOWN_MS).toISOString() };
+  }, [currentUser.usernameChangedAt]);
+
+  const updateProfile = useCallback((update: ProfileUpdate): ReportResult => {
+    const usernameChanging =
+      update.username !== undefined && update.username.trim() !== "" && update.username.trim() !== currentUser.username;
+
+    if (usernameChanging) {
+      const gate = canChangeUsername();
+      if (!gate.allowed) {
+        const when = gate.nextChangeAt ? new Date(gate.nextChangeAt).toLocaleDateString() : "later";
+        return { ok: false, message: `You can only change your username once every 2 weeks. Try again after ${when}.` };
+      }
+      const u = update.username!.trim();
+      if (!/^[A-Za-z0-9_]{3,20}$/.test(u)) {
+        return { ok: false, message: "Username must be 3–20 characters: letters, numbers or underscores." };
+      }
+    }
+
+    setCurrentUser(prev => {
+      const next: AppUser = { ...prev };
+      if (update.displayName !== undefined) next.displayName = update.displayName.trim() || prev.displayName;
+      if (update.bio !== undefined) next.bio = update.bio;
+      if (update.avatarUri !== undefined) next.avatarUri = update.avatarUri ?? undefined;
+      if (update.bannerUri !== undefined) next.bannerUri = update.bannerUri ?? undefined;
+      if (usernameChanging) {
+        next.username = update.username!.trim();
+        next.usernameChangedAt = new Date().toISOString();
+      }
+      AsyncStorage.setItem(KEYS.USER, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+    return { ok: true, message: "Profile updated." };
+  }, [currentUser.username, canChangeUsername]);
+
+  // ─── Reporting (rate-limited + auto-hide) ─────────────────────────────────────
+
+  const checkReportRate = useCallback((): boolean => {
+    const now = Date.now();
+    reportLog.current = reportLog.current.filter(ts => now - ts < REPORT_RATE_WINDOW_MS);
+    if (reportLog.current.length >= REPORT_RATE_MAX) return false;
+    reportLog.current = [...reportLog.current, now];
+    AsyncStorage.setItem(KEYS.REPORTLOG, JSON.stringify(reportLog.current)).catch(() => {});
+    return true;
+  }, []);
+
+  // ─── Scheduled 1 AM Feed thoughts ─────────────────────────────────────────────
+
+  const saveScheduled = useCallback((list: ScheduledThought[]) => {
+    AsyncStorage.setItem(KEYS.SCHEDULED, JSON.stringify(list)).catch(() => {});
+  }, []);
+
+  /** Returns the next 1:00 AM in local time. If it's already past 1 AM today, schedules tomorrow. */
+  const nextOneAM = useCallback((): Date => {
+    const now = new Date();
+    const target = new Date(now);
+    target.setHours(1, 0, 0, 0);
+    if (now.getTime() >= target.getTime()) target.setDate(target.getDate() + 1);
+    return target;
+  }, []);
+
+  const scheduleNightThought = useCallback((content: string): ScheduledThought => {
+    const item: ScheduledThought = {
+      id: "sch_" + Date.now().toString() + Math.random().toString(36).substr(2, 4),
+      content: content.trim(),
+      authorId: currentUser.id,
+      authorName: currentUser.displayName,
+      authorUsername: currentUser.username,
+      publishAt: nextOneAM().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+    setScheduledThoughts(prev => { const next = [item, ...prev]; saveScheduled(next); return next; });
+    return item;
+  }, [currentUser, nextOneAM, saveScheduled]);
+
+  const editScheduledThought = useCallback((id: string, content: string) => {
+    setScheduledThoughts(prev => {
+      const next = prev.map(s => s.id !== id ? s : { ...s, content: content.trim() });
+      saveScheduled(next); return next;
+    });
+  }, [saveScheduled]);
+
+  const deleteScheduledThought = useCallback((id: string) => {
+    setScheduledThoughts(prev => { const next = prev.filter(s => s.id !== id); saveScheduled(next); return next; });
+  }, [saveScheduled]);
 
   // ─── Thought CRUD ────────────────────────────────────────────────────────────
 
@@ -464,7 +618,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [saveThoughts, currentUser]);
 
-  const reportThought = useCallback((thoughtId: string) => {
+  const reportThought = useCallback((thoughtId: string, _reason: string, _description?: string): ReportResult => {
+    if (!checkReportRate()) {
+      return { ok: false, message: "You've reported a lot recently. Please wait a little while before reporting again." };
+    }
     setThoughts(prev => {
       const next = prev.map(t => {
         if (t.id !== thoughtId || t.hasReported) return t;
@@ -472,7 +629,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       saveThoughts(next); return next;
     });
-  }, [saveThoughts]);
+    return { ok: true, message: "Thanks — our moderation team will review this. It's now hidden from your feed." };
+  }, [saveThoughts, checkReportRate]);
+
+  const reportComment = useCallback((thoughtId: string, commentId: string, _reason: string, _description?: string): ReportResult => {
+    if (!checkReportRate()) {
+      return { ok: false, message: "You've reported a lot recently. Please wait a little while before reporting again." };
+    }
+    setComments(prev => {
+      const list = prev[thoughtId] || [];
+      const next = { ...prev, [thoughtId]: list.map(c => c.id !== commentId || c.hasReported ? c : { ...c, hasReported: true, reportCount: c.reportCount + 1 }) };
+      saveComments(next); return next;
+    });
+    return { ok: true, message: "Thanks — our moderation team will review this. It's now hidden from your view." };
+  }, [saveComments, checkReportRate]);
 
   const votePoll = useCallback((thoughtId: string, optionIndex: number) => {
     setThoughts(prev => {
@@ -487,8 +657,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Comments ────────────────────────────────────────────────────────────────
 
-  const addComment = useCallback((comment: Omit<Comment, "id"|"createdAt"|"appreciations"|"hasAppreciated">) => {
-    const newComment: Comment = { ...comment, id: Date.now().toString() + Math.random().toString(36).substr(2, 5), createdAt: new Date().toISOString(), appreciations: 0, hasAppreciated: false };
+  const addComment = useCallback((comment: Omit<Comment, "id"|"createdAt"|"appreciations"|"hasAppreciated"|"reportCount"|"hasReported">) => {
+    const newComment: Comment = { ...comment, id: Date.now().toString() + Math.random().toString(36).substr(2, 5), createdAt: new Date().toISOString(), appreciations: 0, hasAppreciated: false, reportCount: 0, hasReported: false };
     setComments(prev => { const next = { ...prev, [comment.thoughtId]: [...(prev[comment.thoughtId] || []), newComment] }; saveComments(next); return next; });
     setThoughts(prev => { const next = prev.map(t => t.id !== comment.thoughtId ? t : recomputeScore({ ...t, comments: t.comments + 1 })); saveThoughts(next); return next; });
   }, [saveComments, saveThoughts]);
@@ -503,15 +673,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const markAllRead = useCallback(() => setNotifications(prev => prev.map(n => ({ ...n, read: true }))), []);
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  // ─── Publish tick: move due scheduled thoughts into the live 1 AM Feed ─────────
+  useEffect(() => {
+    const publishDue = () => {
+      setScheduledThoughts(prev => {
+        const now = Date.now();
+        const due = prev.filter(s => new Date(s.publishAt).getTime() <= now);
+        if (due.length === 0) return prev;
+        const remaining = prev.filter(s => new Date(s.publishAt).getTime() > now);
+        setThoughts(tPrev => {
+          const published: Thought[] = due.map(s => recomputeScore({
+            id: s.id, content: `#overthink ${s.content}`,
+            authorId: s.authorId, authorName: s.authorName, authorUsername: s.authorUsername,
+            postingMode: "Pseudonymous", alias: s.authorUsername,
+            category: "Night", appreciations: 0, disagreements: 0, reposts: 0, saves: 0, comments: 0,
+            reportCount: 0, qualityScore: 0, createdAt: s.publishAt, isEdited: false,
+            hasAppreciated: false, hasDisagreed: false, hasSaved: false, hasReposted: false, hasReported: false,
+            type: "standard", feedReason: "Posted to 1 AM Feed",
+          }));
+          const next = [...published, ...tPrev];
+          saveThoughts(next);
+          return next;
+        });
+        saveScheduled(remaining);
+        return remaining;
+      });
+    };
+    publishDue();
+    const id = setInterval(publishDue, 30_000);
+    return () => clearInterval(id);
+  }, [saveThoughts, saveScheduled]);
+
   return (
     <AppContext.Provider value={{
       thoughts, comments, notifications, currentUser, unreadCount,
       moodEmoji, setMoodEmoji, bannerColor, setBannerColor,
       translateLang, setTranslateLang, fleetingThoughts, addFleetingThought,
       followedUsers, toggleFollowUser,
+      updateProfile, canChangeUsername,
       addThought, editThought, deleteThought,
       toggleAppreciate, toggleDisagree, toggleSave, toggleRepost, reportThought,
-      votePoll, addComment, toggleCommentAppreciate, markAllRead,
+      votePoll, addComment, toggleCommentAppreciate, reportComment,
+      scheduledThoughts, scheduleNightThought, editScheduledThought, deleteScheduledThought,
+      markAllRead,
     }}>
       {children}
     </AppContext.Provider>

@@ -7,26 +7,134 @@ import {
   TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
-  Alert,
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/useColors";
-import { useApp, Thought, Comment, PostingMode } from "@/context/AppContext";
+import { useApp, Comment, PostingMode } from "@/context/AppContext";
 import { ThoughtCard } from "@/components/ThoughtCard";
 import { formatCount, timeAgo, withinEditWindow } from "@/utils/format";
+import { useFeedback } from "@/hooks/useFeedback";
+import { useModal } from "@/context/ModalContext";
+import { useSettings, AppLanguage } from "@/context/SettingsContext";
+import { modeLabel } from "@/utils/i18n";
 
-type CommentRow = Comment & { isReply?: boolean };
+type Styles = ReturnType<typeof makeStyles>;
+type Colors = ReturnType<typeof useColors>;
+
+const MAX_VISUAL_INDENT = 5;
+const MAX_RENDER_DEPTH = 50;
+
+function commentDisplayName(comment: Comment) {
+  return comment.postingMode === "Anonymous" ? "Anonymous"
+    : comment.postingMode === "Pseudonymous" ? (comment.alias || comment.authorUsername || "Anonymous")
+    : comment.authorName;
+}
+
+interface CommentNodeProps {
+  comment: Comment;
+  allComments: Comment[];
+  depth: number;
+  styles: Styles;
+  colors: Colors;
+  appLanguage: AppLanguage;
+  onReply: (c: Comment) => void;
+  onAppreciate: (cid: string) => void;
+  onReport: (c: Comment) => void;
+  onAuthor: (c: Comment) => void;
+  renderDepth?: number;
+  visited?: ReadonlySet<string>;
+}
+
+function CommentNode({ comment, allComments, depth, styles, colors, appLanguage, onReply, onAppreciate, onReport, onAuthor, renderDepth = 0, visited }: CommentNodeProps) {
+  const seen = visited ?? new Set<string>();
+  const canRecurse = renderDepth < MAX_RENDER_DEPTH && !seen.has(comment.id);
+  const childVisited = canRecurse ? new Set(seen).add(comment.id) : seen;
+  const replies = canRecurse
+    ? allComments.filter(c => c.parentId === comment.id && !c.hasReported && !seen.has(c.id))
+    : [];
+  const authorDisplay = commentDisplayName(comment);
+  const isAnon = comment.postingMode === "Anonymous";
+  const cModeColor =
+    comment.postingMode === "Public" ? colors.publicMode
+    : comment.postingMode === "Pseudonymous" ? colors.pseudonymousMode
+    : colors.anonymousMode;
+  const indented = depth > 0;
+  const avatarSize = indented ? styles.replyAvatar : null;
+
+  return (
+    <View>
+      <View style={[styles.comment, indented && styles.replyComment, indented && { borderLeftColor: colors.border }]}>
+        <TouchableOpacity
+          onPress={() => onAuthor(comment)}
+          activeOpacity={isAnon ? 1 : 0.7}
+          disabled={isAnon}
+        >
+          <View style={[styles.commentAvatar, avatarSize, { backgroundColor: cModeColor + "20" }]}>
+            <Text style={[styles.commentAvatarText, { color: cModeColor }, indented && { fontSize: 11 }]}>
+              {isAnon ? "?" : authorDisplay.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        </TouchableOpacity>
+        <View style={styles.commentContent}>
+          <View style={styles.commentHeader}>
+            <TouchableOpacity onPress={() => onAuthor(comment)} activeOpacity={isAnon ? 1 : 0.7} disabled={isAnon}>
+              <Text style={[styles.commentAuthor, !isAnon && { color: colors.primary }]}>{authorDisplay}</Text>
+            </TouchableOpacity>
+            <Text style={styles.commentMeta}>· {modeLabel(appLanguage, comment.postingMode)} · {timeAgo(comment.createdAt)}</Text>
+          </View>
+          <Text style={styles.commentText}>{comment.content}</Text>
+          <View style={styles.commentActions}>
+            <TouchableOpacity style={styles.commentAction} onPress={() => onAppreciate(comment.id)} activeOpacity={0.7}>
+              <Feather name="heart" size={13} color={comment.hasAppreciated ? colors.appreciate : colors.mutedForeground} />
+              <Text style={[styles.commentActionText, comment.hasAppreciated && { color: colors.appreciate }]}>
+                {formatCount(comment.appreciations)}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.commentAction} onPress={() => onReply(comment)} activeOpacity={0.7}>
+              <Feather name="corner-down-right" size={13} color={colors.mutedForeground} />
+              <Text style={styles.commentActionText}>Reply</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.commentAction} onPress={() => onReport(comment)} activeOpacity={0.7}>
+              <Feather name="flag" size={13} color={colors.mutedForeground} />
+              <Text style={styles.commentActionText}>Report</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      {replies.map(reply => (
+        <CommentNode
+          key={reply.id}
+          comment={reply}
+          allComments={allComments}
+          depth={Math.min(depth + 1, MAX_VISUAL_INDENT)}
+          renderDepth={renderDepth + 1}
+          visited={childVisited}
+          styles={styles}
+          colors={colors}
+          appLanguage={appLanguage}
+          onReply={onReply}
+          onAppreciate={onAppreciate}
+          onReport={onReport}
+          onAuthor={onAuthor}
+        />
+      ))}
+    </View>
+  );
+}
 
 export default function ThoughtDetailScreen() {
   const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { thoughts, comments, addComment, toggleCommentAppreciate, editThought, currentUser } = useApp();
+  const { thoughts, comments, addComment, toggleCommentAppreciate, reportComment, editThought, currentUser } = useApp();
+  const { tap } = useFeedback();
+  const modal = useModal();
+  const { appLanguage } = useSettings();
 
   const [replyText, setReplyText] = useState("");
   const [replyMode, setReplyMode] = useState<PostingMode>("Public");
@@ -38,8 +146,8 @@ export default function ThoughtDetailScreen() {
   const [isEditing, setIsEditing] = useState(edit === "1");
 
   const thought = thoughts.find(t => t.id === id);
-  const threadComments = (comments[id!] || []).filter(c => !c.parentId);
-  const getReplies = (parentId: string) => (comments[id!] || []).filter(c => c.parentId === parentId);
+  const allComments = (comments[id!] || []).filter(c => !c.hasReported);
+  const threadComments = allComments.filter(c => !c.parentId);
 
   const styles = makeStyles(colors);
 
@@ -56,16 +164,17 @@ export default function ThoughtDetailScreen() {
 
   const onSubmitComment = () => {
     if (!replyText.trim()) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    tap();
 
     const parentComment = replyingToId ? (comments[id!] || []).find(c => c.id === replyingToId) : null;
-    const depth = parentComment ? Math.min(parentComment.depth + 1, 2) : 0;
+    const depth = parentComment ? parentComment.depth + 1 : 0;
 
     addComment({
       thoughtId: id!,
       content: replyText.trim(),
       authorId: currentUser.id,
       authorName: currentUser.displayName,
+      authorUsername: currentUser.username,
       postingMode: replyMode,
       alias: replyMode === "Pseudonymous" ? currentUser.displayName.split("_")[0] : undefined,
       parentId: replyingToId || undefined,
@@ -88,19 +197,47 @@ export default function ThoughtDetailScreen() {
     }
     const succeeded = editThought(thought.id, editContent.trim());
     if (!succeeded) {
-      Alert.alert("Edit window closed", "Thoughts can only be edited within 30 minutes of posting.");
+      modal.alert({ title: "Edit window closed", message: "Thoughts can only be edited within 30 minutes of posting." });
     }
     setIsEditing(false);
   };
 
   const onStartReply = (comment: Comment) => {
-    const display =
-      comment.postingMode === "Anonymous" ? "Anonymous"
-      : comment.postingMode === "Pseudonymous" ? (comment.alias || "Anonymous")
-      : comment.authorName;
     setReplyingToId(comment.id);
-    setReplyingToName(display);
+    setReplyingToName(commentDisplayName(comment));
     setReplyText("");
+  };
+
+  const onAppreciateComment = (cid: string) => {
+    tap();
+    toggleCommentAppreciate(id!, cid);
+  };
+
+  const onAuthor = (comment: Comment) => {
+    if (comment.postingMode === "Anonymous") return;
+    if (comment.authorId === currentUser.id) {
+      router.push("/(tabs)/profile");
+    } else {
+      router.push({ pathname: "/profile/[userId]", params: { userId: comment.authorId, name: commentDisplayName(comment) } });
+    }
+  };
+
+  const onReportComment = (comment: Comment) => {
+    if (comment.authorId === currentUser.id) {
+      modal.alert({ title: "Can't report", message: "You can't report your own comment." });
+      return;
+    }
+    if (comment.hasReported) {
+      modal.alert({ title: "Already reported", message: "Our moderation team is reviewing this comment." });
+      return;
+    }
+    modal.report({
+      title: "Report this comment",
+      onSubmit: (reason, description) => {
+        const res = reportComment(id!, comment.id, reason.label, description);
+        modal.alert({ title: res.ok ? "Thanks for reporting" : "Couldn't report", message: res.message });
+      },
+    });
   };
 
   const modeColor =
@@ -112,113 +249,20 @@ export default function ThoughtDetailScreen() {
     setReplyMode(m => m === "Public" ? "Pseudonymous" : m === "Pseudonymous" ? "Anonymous" : "Public");
   };
 
-  const renderComment = ({ item: comment }: { item: Comment }) => {
-    const replies = getReplies(comment.id);
-    const authorDisplay =
-      comment.postingMode === "Anonymous" ? "Anonymous"
-      : comment.postingMode === "Pseudonymous" ? (comment.alias || "Anonymous")
-      : comment.authorName;
-    const cModeColor =
-      comment.postingMode === "Public" ? colors.publicMode
-      : comment.postingMode === "Pseudonymous" ? colors.pseudonymousMode
-      : colors.anonymousMode;
-
-    return (
-      <View>
-        <View style={styles.comment}>
-          <View style={[styles.commentAvatar, { backgroundColor: cModeColor + "20" }]}>
-            <Text style={[styles.commentAvatarText, { color: cModeColor }]}>
-              {comment.postingMode === "Anonymous" ? "?" : authorDisplay.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-          <View style={styles.commentContent}>
-            <View style={styles.commentHeader}>
-              <Text style={styles.commentAuthor}>{authorDisplay}</Text>
-              <Text style={styles.commentMeta}>{timeAgo(comment.createdAt)}</Text>
-            </View>
-            <Text style={styles.commentText}>{comment.content}</Text>
-            <View style={styles.commentActions}>
-              <TouchableOpacity
-                style={styles.commentAction}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  toggleCommentAppreciate(id!, comment.id);
-                }}
-                activeOpacity={0.7}
-              >
-                <Feather
-                  name="heart"
-                  size={13}
-                  color={comment.hasAppreciated ? colors.appreciate : colors.mutedForeground}
-                />
-                <Text style={[styles.commentActionText, comment.hasAppreciated && { color: colors.appreciate }]}>
-                  {formatCount(comment.appreciations)}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.commentAction}
-                onPress={() => onStartReply(comment)}
-                activeOpacity={0.7}
-              >
-                <Feather name="corner-down-right" size={13} color={colors.mutedForeground} />
-                <Text style={styles.commentActionText}>Reply</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-        {replies.map(reply => {
-          const rDisplay =
-            reply.postingMode === "Anonymous" ? "Anonymous"
-            : reply.postingMode === "Pseudonymous" ? (reply.alias || "Anonymous")
-            : reply.authorName;
-          const rColor =
-            reply.postingMode === "Public" ? colors.publicMode
-            : reply.postingMode === "Pseudonymous" ? colors.pseudonymousMode
-            : colors.anonymousMode;
-
-          return (
-            <View
-              key={reply.id}
-              style={[styles.comment, styles.replyComment, { borderLeftColor: colors.border }]}
-            >
-              <View style={[styles.commentAvatar, styles.replyAvatar, { backgroundColor: rColor + "20" }]}>
-                <Text style={[styles.commentAvatarText, { color: rColor, fontSize: 11 }]}>
-                  {reply.postingMode === "Anonymous" ? "?" : rDisplay.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <View style={styles.commentContent}>
-                <View style={styles.commentHeader}>
-                  <Text style={styles.commentAuthor}>{rDisplay}</Text>
-                  <Text style={styles.commentMeta}>{timeAgo(reply.createdAt)}</Text>
-                </View>
-                <Text style={styles.commentText}>{reply.content}</Text>
-                <View style={styles.commentActions}>
-                  <TouchableOpacity
-                    style={styles.commentAction}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      toggleCommentAppreciate(id!, reply.id);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Feather
-                      name="heart"
-                      size={13}
-                      color={reply.hasAppreciated ? colors.appreciate : colors.mutedForeground}
-                    />
-                    <Text style={[styles.commentActionText, reply.hasAppreciated && { color: colors.appreciate }]}>
-                      {formatCount(reply.appreciations)}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          );
-        })}
-      </View>
-    );
-  };
+  const renderComment = ({ item }: { item: Comment }) => (
+    <CommentNode
+      comment={item}
+      allComments={allComments}
+      depth={0}
+      styles={styles}
+      colors={colors}
+      appLanguage={appLanguage}
+      onReply={onStartReply}
+      onAppreciate={onAppreciateComment}
+      onReport={onReportComment}
+      onAuthor={onAuthor}
+    />
+  );
 
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -231,7 +275,7 @@ export default function ThoughtDetailScreen() {
         headerTintColor: colors.primary,
         headerRight: isOwnThought && !isEditing ? () => (
           <TouchableOpacity
-            onPress={canEdit ? onStartEdit : () => Alert.alert("Edit window closed", "Thoughts can only be edited within 30 minutes of posting.")}
+            onPress={canEdit ? onStartEdit : () => modal.alert({ title: "Edit window closed", message: "Thoughts can only be edited within 30 minutes of posting." })}
             style={{ marginRight: 12, padding: 4 }}
             activeOpacity={0.7}
           >
@@ -246,7 +290,7 @@ export default function ThoughtDetailScreen() {
 
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: colors.background }]}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : Platform.OS === "android" ? "height" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         {isEditing ? (
@@ -280,6 +324,7 @@ export default function ThoughtDetailScreen() {
             renderItem={renderComment}
             scrollEnabled={!!threadComments.length}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             ListHeaderComponent={
               <View>
                 <ThoughtCard thought={thought} showReason={false} />
@@ -381,7 +426,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     replyAvatar: { width: 26, height: 26, borderRadius: 13 },
     commentAvatarText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
     commentContent: { flex: 1 },
-    commentHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 },
+    commentHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3, flexWrap: "wrap" },
     commentAuthor: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground },
     commentMeta: { fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular" },
     commentText: { fontSize: 14, lineHeight: 20, color: colors.foreground, fontFamily: "Inter_400Regular" },

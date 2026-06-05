@@ -1,13 +1,14 @@
-import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Platform } from "react-native";
+import React, { useMemo } from "react";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Platform, Animated } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLocalSearchParams, Stack } from "expo-router";
+import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/useColors";
 import { useApp } from "@/context/AppContext";
 import { ThoughtCard } from "@/components/ThoughtCard";
 import { formatCount } from "@/utils/format";
+import { useFeedback } from "@/hooks/useFeedback";
+import { useBounce } from "@/hooks/useBounce";
 
 const AVATAR_BG_POOL = ["#C8F5D8","#C8D8FF","#E8C8FF","#FFE8C8","#C8FFEE","#FFD8E8"];
 function avatarBg(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h = s.charCodeAt(i) + h * 31; return AVATAR_BG_POOL[Math.abs(h) % AVATAR_BG_POOL.length]; }
@@ -15,11 +16,16 @@ function avatarBg(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h =
 export default function PublicProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { userId, name } = useLocalSearchParams<{ userId: string; name?: string }>();
   const { thoughts, currentUser, followedUsers, toggleFollowUser } = useApp();
+  const { tap } = useFeedback();
+  const { scale, bounce } = useBounce();
   const bottomPad = Platform.OS === "web" ? 84 : 56 + insets.bottom;
 
-  const isFollowed = followedUsers.has(userId!);
+  const safeUserId = userId ?? "";
+  const isOwnProfile = safeUserId === currentUser.id;
+  const isFollowed = followedUsers.has(safeUserId);
 
   const userThoughts = useMemo(
     () => thoughts.filter(t => t.authorId === userId && !t.isRepost),
@@ -28,7 +34,7 @@ export default function PublicProfileScreen() {
 
   const displayName = name || (userThoughts[0]
     ? (userThoughts[0].alias || userThoughts[0].authorName)
-    : userId);
+    : safeUserId) || "User";
 
   const totalAppreciations = userThoughts.reduce((s, t) => s + t.appreciations, 0);
   const topCategory = useMemo(() => {
@@ -63,7 +69,7 @@ export default function PublicProfileScreen() {
           <View>
             {/* Banner */}
             <View style={[styles.banner, { backgroundColor: colors.primary + "25" }]}>
-              <View style={[styles.avatar, { backgroundColor: avatarBg(displayName || userId!) }]}>
+              <View style={[styles.avatar, { backgroundColor: avatarBg(displayName) }]}>
                 <Text style={styles.avatarText}>
                   {(displayName || "?").slice(0, 2).toUpperCase()}
                 </Text>
@@ -79,19 +85,29 @@ export default function PublicProfileScreen() {
                     <Text style={[styles.badgeLabel, { color: badge.color }]}>{badge.label}</Text>
                   </View>
                 </View>
-                {userId !== currentUser.id && (
+                {isOwnProfile ? (
                   <TouchableOpacity
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggleFollowUser(userId!); }}
-                    style={[styles.followBtn, {
-                      backgroundColor: isFollowed ? "transparent" : colors.primary,
-                      borderColor: isFollowed ? colors.border : colors.primary,
-                    }]}
+                    onPress={() => { tap(); router.push("/profile"); }}
+                    style={[styles.followBtn, { backgroundColor: "transparent", borderColor: colors.border }]}
                     activeOpacity={0.8}
                   >
-                    <Text style={[styles.followBtnText, { color: isFollowed ? colors.foreground : "#fff" }]}>
-                      {isFollowed ? "Following" : "Follow"}
-                    </Text>
+                    <Text style={[styles.followBtnText, { color: colors.foreground }]}>Edit Profile</Text>
                   </TouchableOpacity>
+                ) : (
+                  <Animated.View style={{ transform: [{ scale }] }}>
+                    <TouchableOpacity
+                      onPress={() => { tap(); bounce(); toggleFollowUser(safeUserId); }}
+                      style={[styles.followBtn, {
+                        backgroundColor: isFollowed ? "transparent" : colors.primary,
+                        borderColor: isFollowed ? colors.border : colors.primary,
+                      }]}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.followBtnText, { color: isFollowed ? colors.foreground : "#fff" }]}>
+                        {isFollowed ? "Following" : "Follow"}
+                      </Text>
+                    </TouchableOpacity>
+                  </Animated.View>
                 )}
               </View>
 

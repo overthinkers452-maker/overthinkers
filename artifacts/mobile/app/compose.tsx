@@ -12,12 +12,14 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { Stack } from "expo-router";
 import { useColors } from "@/hooks/useColors";
-import { useApp, PostingMode } from "@/context/AppContext";
+import { useApp, PostingMode, PollDuration } from "@/context/AppContext";
 import { ModeSelector } from "@/components/ModeSelector";
+import { useFeedback } from "@/hooks/useFeedback";
+import { useSettings } from "@/context/SettingsContext";
+import { modeLabel } from "@/utils/i18n";
 
 const CATEGORIES = [
   "Philosophy", "Technology", "Culture", "Psychology",
@@ -31,13 +33,15 @@ export default function ComposeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { addThought, currentUser } = useApp();
+  const { success, select } = useFeedback();
+  const { appLanguage } = useSettings();
 
   const [content, setContent] = useState("");
   const [mode, setMode] = useState<PostingMode>("Public");
   const [category, setCategory] = useState("Philosophy");
   const [showPoll, setShowPoll] = useState(false);
   const [pollOptions, setPollOptions] = useState(["", ""]);
-  const [pollDuration, setPollDuration] = useState<"24h" | "48h" | "7d">("24h");
+  const [pollDuration, setPollDuration] = useState<PollDuration>("24h");
   const [showCategories, setShowCategories] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
 
@@ -53,13 +57,15 @@ export default function ComposeScreen() {
 
   const onPost = () => {
     if (!canPost) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    success();
 
     const pollData = showPoll && pollOptions.filter(o => o.trim()).length >= 2
       ? {
           options: pollOptions.filter(o => o.trim()).map(text => ({ text, votes: 0 })),
           duration: pollDuration,
-          expiresAt: new Date(Date.now() + (pollDuration === "24h" ? 86400000 : pollDuration === "48h" ? 172800000 : 604800000)).toISOString(),
+          expiresAt: pollDuration === "manual"
+            ? null
+            : new Date(Date.now() + (pollDuration === "24h" ? 86400000 : pollDuration === "48h" ? 172800000 : 604800000)).toISOString(),
           totalVotes: 0,
         }
       : undefined;
@@ -137,7 +143,7 @@ export default function ComposeScreen() {
               activeOpacity={0.8}
             >
               <Text style={[styles.modeBtnText, { color: modeColor }]}>
-                {mode}
+                {modeLabel(appLanguage, mode)}
               </Text>
               <Feather name="chevron-down" size={13} color={modeColor} />
             </TouchableOpacity>
@@ -219,7 +225,7 @@ export default function ComposeScreen() {
           </View>
           <Switch
             value={showPoll}
-            onValueChange={(v) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowPoll(v); }}
+            onValueChange={(v) => { select(); setShowPoll(v); }}
             trackColor={{ false: colors.muted, true: colors.primary + "60" }}
             thumbColor={showPoll ? colors.primary : colors.mutedForeground}
           />
@@ -253,17 +259,22 @@ export default function ComposeScreen() {
             <View style={styles.durationRow}>
               <Text style={[styles.durationLabel, { color: colors.mutedForeground }]}>Duration</Text>
               <View style={styles.durationOptions}>
-                {(["24h", "48h", "7d"] as const).map(d => (
+                {([
+                  { value: "24h" as PollDuration, label: "24h" },
+                  { value: "48h" as PollDuration, label: "48h" },
+                  { value: "7d" as PollDuration, label: "7d" },
+                  { value: "manual" as PollDuration, label: "Until I delete it" },
+                ]).map(d => (
                   <TouchableOpacity
-                    key={d}
-                    onPress={() => setPollDuration(d)}
+                    key={d.value}
+                    onPress={() => { select(); setPollDuration(d.value); }}
                     style={[styles.durationChip, {
-                      borderColor: pollDuration === d ? colors.primary : colors.border,
-                      backgroundColor: pollDuration === d ? colors.primary + "15" : colors.secondary,
+                      borderColor: pollDuration === d.value ? colors.primary : colors.border,
+                      backgroundColor: pollDuration === d.value ? colors.primary + "15" : colors.secondary,
                     }]}
                     activeOpacity={0.8}
                   >
-                    <Text style={[styles.durationText, { color: pollDuration === d ? colors.primary : colors.foreground }]}>{d}</Text>
+                    <Text style={[styles.durationText, { color: pollDuration === d.value ? colors.primary : colors.foreground }]}>{d.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>

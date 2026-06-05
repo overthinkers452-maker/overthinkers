@@ -1,15 +1,19 @@
 import React, { useCallback, useRef, useState } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, Pressable, Alert, Modal,
-  ActivityIndicator, ScrollView, Platform,
+  View, Text, StyleSheet, TouchableOpacity, Pressable, Modal,
+  ActivityIndicator, ScrollView, Animated,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { Thought, useApp } from "@/context/AppContext";
 import { PollCard } from "@/components/PollCard";
 import { formatCount, timeAgo, withinEditWindow } from "@/utils/format";
+import { useFeedback } from "@/hooks/useFeedback";
+import { useBounce } from "@/hooks/useBounce";
+import { useSettings } from "@/context/SettingsContext";
+import { useModal } from "@/context/ModalContext";
+import { modeLabel } from "@/utils/i18n";
 
 interface Props { thought: Thought; showReason?: boolean; }
 
@@ -40,6 +44,11 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
   const colors = useColors();
   const router = useRouter();
   const { toggleAppreciate, toggleDisagree, toggleSave, toggleRepost, reportThought, deleteThought, currentUser, translateLang, setTranslateLang } = useApp();
+  const { tap, select } = useFeedback();
+  const { appLanguage } = useSettings();
+  const modal = useModal();
+  const { scale: heartScale, bounce: heartBounce } = useBounce();
+  const { scale: saveScale, bounce: saveBounce } = useBounce();
 
   const [translatedText, setTranslatedText] = useState<string | null>(null);
   const [showTranslation, setShowTranslation] = useState(false);
@@ -110,28 +119,46 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
   }, []);
 
   // ─── Engagement handlers ───────────────────────────────────────────────────
-  const onAppreciate = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggleAppreciate(thought.id); }, [thought.id, toggleAppreciate]);
-  const onDisagree   = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggleDisagree(thought.id); }, [thought.id, toggleDisagree]);
-  const onSave       = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); toggleSave(thought.id); }, [thought.id, toggleSave]);
-  const onRepost     = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggleRepost(thought.id); }, [thought.id, toggleRepost]);
+  const onAppreciate = useCallback(() => { tap(); heartBounce(); toggleAppreciate(thought.id); }, [thought.id, toggleAppreciate, tap, heartBounce]);
+  const onDisagree   = useCallback(() => { tap(); toggleDisagree(thought.id); }, [thought.id, toggleDisagree, tap]);
+  const onSave       = useCallback(() => { tap(); saveBounce(); toggleSave(thought.id); }, [thought.id, toggleSave, tap, saveBounce]);
+  const onRepost     = useCallback(() => { tap(); toggleRepost(thought.id); }, [thought.id, toggleRepost, tap]);
   const onPress      = useCallback(() => router.push({ pathname: "/thought/[id]", params: { id: thought.id } }), [thought.id, router]);
 
   const onMenuPress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    select();
     if (isOwnThought) {
       const canEdit = withinEditWindow(thought.createdAt);
-      Alert.alert("Thought options", undefined, [
-        ...(canEdit ? [{ text: "Edit thought", onPress: () => router.push({ pathname: "/thought/[id]", params: { id: thought.id, edit: "1" } }) }] : [{ text: "Edit window closed (30 min)" }]),
-        { text: "Delete thought", style: "destructive" as const, onPress: () => Alert.alert("Delete thought", "This cannot be undone.", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => deleteThought(thought.id) }]) },
-        { text: "Cancel", style: "cancel" as const },
-      ]);
+      modal.sheet({
+        title: "Thought options",
+        actions: [
+          canEdit
+            ? { label: "Edit thought", icon: "edit-2", onPress: () => router.push({ pathname: "/thought/[id]", params: { id: thought.id, edit: "1" } }) }
+            : { label: "Edit window closed (30 min)", icon: "clock", disabled: true },
+          {
+            label: "Delete thought", icon: "trash-2", destructive: true,
+            onPress: () => modal.confirm({
+              title: "Delete thought",
+              message: "This cannot be undone.",
+              confirmText: "Delete",
+              destructive: true,
+              onConfirm: () => deleteThought(thought.id),
+            }),
+          },
+        ],
+      });
+    } else if (thought.hasReported) {
+      modal.alert({ title: "Already reported", message: "Our moderation team is reviewing this thought." });
     } else {
-      Alert.alert("Report or block", thought.hasReported ? "You've already reported this." : undefined, [
-        { text: thought.hasReported ? "Already reported" : "Report this thought", style: thought.hasReported ? "default" : "destructive", onPress: () => { if (!thought.hasReported) { reportThought(thought.id); Alert.alert("Reported", "Our moderation team will review this."); } } },
-        { text: "Cancel", style: "cancel" },
-      ]);
+      modal.report({
+        title: "Report this thought",
+        onSubmit: (reason, description) => {
+          const res = reportThought(thought.id, reason.label, description);
+          modal.alert({ title: res.ok ? "Thanks for reporting" : "Couldn't report", message: res.message });
+        },
+      });
     }
-  }, [isOwnThought, thought, router, reportThought, deleteThought]);
+  }, [isOwnThought, thought, router, reportThought, deleteThought, modal, select]);
 
   const s = makeStyles(colors);
 
@@ -174,7 +201,7 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
         <View style={s.headerRight}>
           <View style={[s.modeBadge, { backgroundColor: modeColor + "18", borderColor: modeColor + "30" }]}>
             <Feather name={modeIcon} size={11} color={modeColor} />
-            <Text style={[s.modeText, { color: modeColor }]}>{thought.postingMode}</Text>
+            <Text style={[s.modeText, { color: modeColor }]}>{modeLabel(appLanguage, thought.postingMode)}</Text>
           </View>
           <TouchableOpacity style={s.menuBtn} onPress={onMenuPress} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Feather name="more-horizontal" size={18} color={colors.mutedForeground} />
@@ -198,7 +225,9 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
 
       <View style={s.actions}>
         <TouchableOpacity onPress={onAppreciate} style={s.actionBtn} activeOpacity={0.7}>
-          <Feather name="heart" size={16} color={thought.hasAppreciated ? colors.appreciate : colors.mutedForeground} />
+          <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+            <Feather name="heart" size={16} color={thought.hasAppreciated ? colors.appreciate : colors.mutedForeground} />
+          </Animated.View>
           <Text style={[s.actionCount, thought.hasAppreciated && { color: colors.appreciate }]}>{formatCount(thought.appreciations)}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={onDisagree} style={s.actionBtn} activeOpacity={0.7}>
@@ -214,7 +243,9 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
           <Text style={[s.actionCount, thought.hasReposted && { color: colors.primary }]}>{formatCount(thought.reposts)}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={onSave} style={s.actionBtn} activeOpacity={0.7}>
-          <Feather name="bookmark" size={16} color={thought.hasSaved ? colors.gold : colors.mutedForeground} />
+          <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+            <Feather name="bookmark" size={16} color={thought.hasSaved ? colors.gold : colors.mutedForeground} />
+          </Animated.View>
           <Text style={[s.actionCount, thought.hasSaved && { color: colors.gold }]}>{formatCount(thought.saves)}</Text>
         </TouchableOpacity>
       </View>

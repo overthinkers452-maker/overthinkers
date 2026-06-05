@@ -1,9 +1,9 @@
 import React, { useCallback } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/useColors";
 import { Thought, useApp } from "@/context/AppContext";
 import { formatCount, timeUntil } from "@/utils/format";
+import { useFeedback } from "@/hooks/useFeedback";
 
 interface PollCardProps {
   thought: Thought;
@@ -12,15 +12,17 @@ interface PollCardProps {
 export function PollCard({ thought }: PollCardProps) {
   const colors = useColors();
   const { votePoll } = useApp();
+  const { select } = useFeedback();
   const poll = thought.poll!;
   const hasVoted = poll.userVote !== undefined;
-  const isExpired = new Date(poll.expiresAt) < new Date();
+  const isManual = poll.expiresAt === null;
+  const isExpired = !isManual && new Date(poll.expiresAt!) < new Date();
 
   const onVote = useCallback((index: number) => {
     if (hasVoted || isExpired) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    select();
     votePoll(thought.id, index);
-  }, [hasVoted, isExpired, thought.id, votePoll]);
+  }, [hasVoted, isExpired, thought.id, votePoll, select]);
 
   const styles = makeStyles(colors);
 
@@ -76,7 +78,7 @@ export function PollCard({ thought }: PollCardProps) {
         );
       })}
       <Text style={styles.pollMeta}>
-        {formatCount(poll.totalVotes)} votes · {isExpired ? "Poll closed" : timeUntil(poll.expiresAt) + " left"}
+        {formatCount(poll.totalVotes)} votes · {isManual ? "Open until deleted" : isExpired ? "Poll closed" : timeUntil(poll.expiresAt!) + " left"}
       </Text>
     </View>
   );
