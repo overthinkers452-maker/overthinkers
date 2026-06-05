@@ -5,8 +5,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { useColors } from "@/hooks/useColors";
-import { useApp, ScheduledThought } from "@/context/AppContext";
+import { useApp } from "@/context/AppContext";
 import { useSettings } from "@/context/SettingsContext";
 import { formatCount, timeAgo } from "@/utils/format";
 import { useFeedback } from "@/hooks/useFeedback";
@@ -26,15 +25,13 @@ function tzAbbr() {
   } catch { return ""; }
 }
 
-function formatPublishAt(iso: string) {
-  const d = new Date(iso);
-  const now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  const tomorrow = new Date(now); tomorrow.setDate(now.getDate() + 1);
-  const isTomorrow = d.toDateString() === tomorrow.toDateString();
-  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  const day = sameDay ? "today" : isTomorrow ? "tomorrow" : d.toLocaleDateString([], { weekday: "long" });
-  return `${time} ${day}`;
+const OPEN_HOUR = 22; // 10 PM
+const CLOSE_HOUR = 4; // 4 AM
+
+/** The feed is open from 10 PM through 4 AM (local time). */
+function isNightOpen(d: Date = new Date()) {
+  const h = d.getHours();
+  return h >= OPEN_HOUR || h < CLOSE_HOUR;
 }
 
 // ─── Night badges ─────────────────────────────────────────────────────────────
@@ -110,18 +107,17 @@ const sf = StyleSheet.create({
   star: { position: "absolute", color: "#C4B5FD" },
 });
 
-// ─── Compose / edit modal ──────────────────────────────────────────────────────
+// ─── Compose modal — posts instantly ───────────────────────────────────────────
 
-function ComposeModal({ visible, onClose, onSubmit, initialText, isEdit }: {
+function ComposeModal({ visible, onClose, onSubmit }: {
   visible: boolean; onClose: () => void; onSubmit: (text: string) => void;
-  initialText?: string; isEdit?: boolean;
 }) {
   const [text, setText] = useState("");
   const remaining = 280 - text.length;
 
   useEffect(() => {
-    if (visible) setText(initialText ?? "");
-  }, [visible, initialText]);
+    if (visible) setText("");
+  }, [visible]);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -129,7 +125,7 @@ function ComposeModal({ visible, onClose, onSubmit, initialText, isEdit }: {
         <View style={cm.sheet}>
           <View style={cm.handle} />
           <View style={cm.headerRow}>
-            <Text style={cm.title}>{isEdit ? "🌙 Edit scheduled thought" : "🌙 Schedule a thought"}</Text>
+            <Text style={cm.title}>🌙 Share now</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Feather name="x" size={20} color={NIGHT.muted} />
             </TouchableOpacity>
@@ -148,14 +144,12 @@ function ComposeModal({ visible, onClose, onSubmit, initialText, isEdit }: {
             maxLength={280}
             autoFocus
           />
-          {!isEdit && (
-            <View style={cm.scheduleNote}>
-              <Feather name="clock" size={13} color={NIGHT.accent} />
-              <Text style={cm.scheduleNoteText}>
-                Auto-posts at <Text style={{ color: NIGHT.accent, fontFamily: "Inter_600SemiBold" }}>1:00 AM {tzAbbr()}</Text> ({TIMEZONE})
-              </Text>
-            </View>
-          )}
+          <View style={cm.liveNote}>
+            <Feather name="zap" size={13} color={NIGHT.accent} />
+            <Text style={cm.liveNoteText}>
+              Posts <Text style={{ color: NIGHT.accent, fontFamily: "Inter_600SemiBold" }}>live, right now</Text> to the Late Night feed
+            </Text>
+          </View>
           <View style={cm.footer}>
             <Text style={[cm.counter, remaining < 40 && { color: remaining < 10 ? "#EF4444" : "#FBBF24" }]}>
               {remaining}
@@ -165,7 +159,7 @@ function ComposeModal({ visible, onClose, onSubmit, initialText, isEdit }: {
               style={[cm.submitBtn, { opacity: text.trim() ? 1 : 0.4 }]}
               activeOpacity={0.8}
             >
-              <Text style={cm.submitText}>{isEdit ? "Save changes" : "Schedule for 1 AM"}</Text>
+              <Text style={cm.submitText}>Share now</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -185,53 +179,12 @@ const cm = StyleSheet.create({
   tagText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: NIGHT.accent },
   tagHint: { fontSize: 12, fontFamily: "Inter_400Regular", color: NIGHT.muted },
   input: { backgroundColor: NIGHT.card, borderRadius: 12, borderWidth: 1, borderColor: NIGHT.border, padding: 14, fontSize: 15, fontFamily: "Inter_400Regular", color: NIGHT.text, minHeight: 120, textAlignVertical: "top", lineHeight: 22 },
-  scheduleNote: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 12, backgroundColor: NIGHT.primary + "18", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: NIGHT.primary + "35" },
-  scheduleNoteText: { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular", color: NIGHT.subtext, lineHeight: 17 },
+  liveNote: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 12, backgroundColor: NIGHT.primary + "18", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: NIGHT.primary + "35" },
+  liveNoteText: { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular", color: NIGHT.subtext, lineHeight: 17 },
   footer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12 },
   counter: { fontSize: 13, fontFamily: "Inter_400Regular", color: NIGHT.muted },
   submitBtn: { backgroundColor: NIGHT.primary, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10 },
   submitText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
-});
-
-// ─── Scheduled thought card (pending, owned by the user) ───────────────────────
-
-function ScheduledCard({ item, onEdit, onDelete }: {
-  item: ScheduledThought; onEdit: () => void; onDelete: () => void;
-}) {
-  return (
-    <View style={sc.card}>
-      <View style={sc.topRow}>
-        <View style={sc.badge}>
-          <Feather name="clock" size={11} color={NIGHT.accent} />
-          <Text style={sc.badgeText}>Scheduled</Text>
-        </View>
-        <Text style={sc.when}>Posts {formatPublishAt(item.publishAt)}</Text>
-      </View>
-      <Text style={sc.content}>{item.content}</Text>
-      <View style={sc.actions}>
-        <TouchableOpacity onPress={onEdit} style={sc.actionBtn} activeOpacity={0.7}>
-          <Feather name="edit-2" size={13} color={NIGHT.accent} />
-          <Text style={sc.actionText}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={onDelete} style={sc.actionBtn} activeOpacity={0.7}>
-          <Feather name="trash-2" size={13} color="#F9A8D4" />
-          <Text style={[sc.actionText, { color: "#F9A8D4" }]}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
-const sc = StyleSheet.create({
-  card: { backgroundColor: NIGHT.surface, marginHorizontal: 12, marginVertical: 5, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: NIGHT.primary + "40", borderStyle: "dashed" },
-  topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
-  badge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: NIGHT.primary + "30", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: NIGHT.accent },
-  when: { fontSize: 11, fontFamily: "Inter_500Medium", color: NIGHT.subtext },
-  content: { fontSize: 14, fontFamily: "Inter_400Regular", color: NIGHT.text, lineHeight: 21, marginBottom: 12 },
-  actions: { flexDirection: "row", gap: 18 },
-  actionBtn: { flexDirection: "row", alignItems: "center", gap: 5 },
-  actionText: { fontSize: 13, fontFamily: "Inter_500Medium", color: NIGHT.accent },
 });
 
 // ─── Published night thought card ──────────────────────────────────────────────
@@ -256,7 +209,7 @@ function NightThoughtCard({ content, author, alias, postingMode, createdAt, appr
         </View>
         <View style={nc.postedChip}>
           <Feather name="check" size={10} color={NIGHT.accent} />
-          <Text style={nc.postedChipText}>Posted</Text>
+          <Text style={nc.postedChipText}>Live</Text>
         </View>
       </View>
       <Text style={nc.content}>{content.replace(/#overthink\s*/gi, "").trim()}</Text>
@@ -279,9 +232,9 @@ const nc = StyleSheet.create({
   avatarText: { fontSize: 14, fontFamily: "Inter_700Bold", color: NIGHT.accent },
   author: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: NIGHT.text },
   time: { fontSize: 11, fontFamily: "Inter_400Regular", color: NIGHT.muted },
+  content: { fontSize: 14, fontFamily: "Inter_400Regular", color: NIGHT.text, lineHeight: 22, marginBottom: 12 },
   postedChip: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: NIGHT.primary + "20", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: NIGHT.primary + "40" },
   postedChipText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: NIGHT.accent },
-  content: { fontSize: 14, fontFamily: "Inter_400Regular", color: NIGHT.text, lineHeight: 22, marginBottom: 12 },
   appreciateBtn: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start" },
   heartIcon: { fontSize: 18, color: NIGHT.muted },
   appreciateCount: { fontSize: 13, fontFamily: "Inter_400Regular", color: NIGHT.muted },
@@ -291,16 +244,19 @@ const nc = StyleSheet.create({
 
 export default function LateNightScreen() {
   const insets = useSafeAreaInsets();
-  const {
-    thoughts, currentUser, toggleAppreciate, isBlocked,
-    scheduledThoughts, scheduleNightThought, editScheduledThought, deleteScheduledThought,
-  } = useApp();
+  const { thoughts, currentUser, toggleAppreciate, isBlocked, postNightThought } = useApp();
   const { blockedWords } = useSettings();
   const { tap, success } = useFeedback();
   const modal = useModal();
 
   const [showCompose, setShowCompose] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [nightOpen, setNightOpen] = useState(() => isNightOpen());
+
+  // Re-evaluate the open/closed window periodically so the UI flips at 10 PM / 4 AM.
+  useEffect(() => {
+    const id = setInterval(() => setNightOpen(isNightOpen()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   const topPad    = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : 56 + insets.bottom;
@@ -312,12 +268,6 @@ export default function LateNightScreen() {
       { blockedWords, isBlocked, currentUserId: currentUser.id }
     ),
     [thoughts, blockedWords, isBlocked, currentUser.id]
-  );
-
-  // The current user's pending (scheduled, not yet posted) thoughts
-  const myScheduled = useMemo(
-    () => scheduledThoughts.filter(s => s.authorId === currentUser.id),
-    [scheduledThoughts, currentUser.id]
   );
 
   const myNightCount = useMemo(
@@ -340,27 +290,29 @@ export default function LateNightScreen() {
       .slice(0, 5);
   }, [nightThoughts]);
 
-  const editingItem = editingId ? myScheduled.find(s => s.id === editingId) : null;
-
   const onSubmitThought = useCallback((text: string) => {
-    success();
-    if (editingId) {
-      editScheduledThought(editingId, text);
-      setEditingId(null);
+    const posted = postNightThought(text);
+    if (posted) {
+      success();
     } else {
-      scheduleNightThought(text);
+      modal.alert({
+        title: "The feed just closed 🌙",
+        message: "Late Night closes at 4:00 AM. Come back at 10:00 PM to share instantly.",
+      });
     }
-  }, [success, editingId, editScheduledThought, scheduleNightThought]);
+  }, [success, postNightThought, modal]);
 
-  const onDeleteScheduled = useCallback((item: ScheduledThought) => {
-    modal.confirm({
-      title: "Delete scheduled thought",
-      message: "This won't be posted to the 1 AM Feed.",
-      confirmText: "Delete",
-      destructive: true,
-      onConfirm: () => deleteScheduledThought(item.id),
-    });
-  }, [modal, deleteScheduledThought]);
+  const onPressShare = useCallback(() => {
+    tap();
+    if (!isNightOpen()) {
+      modal.alert({
+        title: "The feed is asleep 🌙",
+        message: "Late Night is open from 10:00 PM to 4:00 AM. Come back during those hours to share instantly.",
+      });
+      return;
+    }
+    setShowCompose(true);
+  }, [tap, modal]);
 
   return (
     <View style={[s.container, { paddingTop: topPad }]}>
@@ -369,8 +321,8 @@ export default function LateNightScreen() {
       {/* Header */}
       <View style={s.header}>
         <View>
-          <Text style={s.title}>1 AM Feed 🌙</Text>
-          <Text style={s.subtitle}>Write anytime · auto-posts at 1 AM</Text>
+          <Text style={s.title}>Late Night 🌙</Text>
+          <Text style={s.subtitle}>Open 10 PM–4 AM · share instantly</Text>
         </View>
         {myBadge && (
           <View style={[s.myBadge, { borderColor: myBadge.color + "60", backgroundColor: myBadge.color + "20" }]}>
@@ -380,12 +332,18 @@ export default function LateNightScreen() {
         )}
       </View>
 
-      {/* Timezone clarity */}
+      {/* Open / closed status */}
       <View style={s.tzBar}>
-        <Feather name="globe" size={13} color={NIGHT.muted} />
-        <Text style={s.tzText}>
-          Posts go live at <Text style={{ color: NIGHT.accent, fontFamily: "Inter_600SemiBold" }}>1:00 AM {tzAbbr()}</Text> · {TIMEZONE}
-        </Text>
+        <Feather name={nightOpen ? "zap" : "moon"} size={13} color={nightOpen ? NIGHT.accent : NIGHT.muted} />
+        {nightOpen ? (
+          <Text style={s.tzText}>
+            <Text style={{ color: NIGHT.accent, fontFamily: "Inter_600SemiBold" }}>Live now</Text> · open until 4:00 AM {tzAbbr()} · {TIMEZONE}
+          </Text>
+        ) : (
+          <Text style={s.tzText}>
+            Opens at <Text style={{ color: NIGHT.accent, fontFamily: "Inter_600SemiBold" }}>10:00 PM {tzAbbr()}</Text> · {TIMEZONE}
+          </Text>
+        )}
       </View>
 
       <FlatList
@@ -407,20 +365,6 @@ export default function LateNightScreen() {
         )}
         ListHeaderComponent={
           <View>
-            {myScheduled.length > 0 && (
-              <View style={s.scheduledSection}>
-                <Text style={s.sectionLabel}>⏳ YOUR SCHEDULED THOUGHTS</Text>
-                {myScheduled.map(item => (
-                  <ScheduledCard
-                    key={item.id}
-                    item={item}
-                    onEdit={() => { tap(); setEditingId(item.id); setShowCompose(true); }}
-                    onDelete={() => onDeleteScheduled(item)}
-                  />
-                ))}
-              </View>
-            )}
-
             {topContributors.length > 0 && (
               <View style={s.leaderStrip}>
                 <Text style={s.leaderLabel}>⭐ TONIGHT'S THINKERS</Text>
@@ -438,7 +382,7 @@ export default function LateNightScreen() {
             )}
 
             {nightThoughts.length > 0 && (
-              <Text style={[s.sectionLabel, { marginHorizontal: 16, marginTop: 8 }]}>🌙 POSTED TO THE FEED</Text>
+              <Text style={[s.sectionLabel, { marginHorizontal: 16, marginTop: 8 }]}>🌙 LIVE ON THE FEED</Text>
             )}
           </View>
         }
@@ -447,28 +391,28 @@ export default function LateNightScreen() {
             <Text style={s.emptyMoon}>🌕</Text>
             <Text style={s.emptyTitle}>The feed is quiet</Text>
             <Text style={s.emptyText}>
-              Schedule a thought and it'll appear here when the clock strikes 1 AM.
+              {nightOpen
+                ? "Share a thought and it'll appear here instantly."
+                : "Late Night opens at 10 PM. Come back then to share instantly."}
             </Text>
           </View>
         }
       />
 
-      {/* Compose FAB — always available */}
+      {/* Compose FAB */}
       <TouchableOpacity
-        style={[s.fab, { bottom: bottomPad + 16 }]}
-        onPress={() => { tap(); setEditingId(null); setShowCompose(true); }}
+        style={[s.fab, { bottom: bottomPad + 16 }, !nightOpen && s.fabClosed]}
+        onPress={onPressShare}
         activeOpacity={0.85}
       >
-        <Text style={s.fabMoon}>🌙</Text>
-        <Text style={s.fabText}>Schedule a thought</Text>
+        <Text style={s.fabMoon}>{nightOpen ? "🌙" : "💤"}</Text>
+        <Text style={s.fabText}>{nightOpen ? "Share now (10 PM–4 AM)" : "Opens at 10 PM"}</Text>
       </TouchableOpacity>
 
       <ComposeModal
         visible={showCompose}
-        onClose={() => { setShowCompose(false); setEditingId(null); }}
+        onClose={() => setShowCompose(false)}
         onSubmit={onSubmitThought}
-        initialText={editingItem?.content}
-        isEdit={!!editingId}
       />
     </View>
   );
@@ -495,7 +439,6 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: NIGHT.border, zIndex: 1,
   },
   tzText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: NIGHT.subtext },
-  scheduledSection: { paddingTop: 14, paddingBottom: 4, zIndex: 1 },
   sectionLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: NIGHT.muted, letterSpacing: 1.2, marginBottom: 8, marginHorizontal: 12 },
   leaderStrip: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 8, zIndex: 1 },
   leaderLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: NIGHT.muted, letterSpacing: 1.2, marginBottom: 8 },
@@ -520,6 +463,7 @@ const s = StyleSheet.create({
     shadowColor: NIGHT.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
     zIndex: 10,
   },
+  fabClosed: { backgroundColor: NIGHT.surface, borderColor: NIGHT.border, shadowOpacity: 0 },
   fabMoon: { fontSize: 18 },
   fabText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });

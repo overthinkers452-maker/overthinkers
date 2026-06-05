@@ -101,17 +101,6 @@ export interface AppUser {
   usernameChangedAt?: string;
 }
 
-export interface ScheduledThought {
-  id: string;
-  content: string;
-  authorId: string;
-  authorName: string;
-  authorUsername: string;
-  /** ISO timestamp when this will auto-publish to the 1 AM Feed */
-  publishAt: string;
-  createdAt: string;
-}
-
 export type ReportResult = { ok: boolean; message: string };
 
 export interface ProfileUpdate {
@@ -160,10 +149,8 @@ interface AppContextType {
   addComment: (comment: Omit<Comment, "id"|"createdAt"|"appreciations"|"hasAppreciated"|"reportCount"|"hasReported">) => void;
   toggleCommentAppreciate: (thoughtId: string, commentId: string) => void;
   reportComment: (thoughtId: string, commentId: string, reason: string, description?: string) => ReportResult;
-  scheduledThoughts: ScheduledThought[];
-  scheduleNightThought: (content: string) => ScheduledThought;
-  editScheduledThought: (id: string, content: string) => void;
-  deleteScheduledThought: (id: string) => void;
+  /** Posts a thought instantly to the Late Night feed (tagged #overthink). Returns false if the 10 PM–4 AM window is closed. */
+  postNightThought: (content: string) => boolean;
   markAllRead: () => void;
 }
 
@@ -324,7 +311,6 @@ const KEYS = {
   FLEETING: "@overthinkers/fleeting",
   FOLLOWED: "@overthinkers/followedUsers",
   USER: "@overthinkers/currentUser/v1",
-  SCHEDULED: "@overthinkers/scheduledNight/v1",
   REPORTLOG: "@overthinkers/reportLog/v1",
   BLOCKED: "@overthinkers/blockedUsers/v1",
 };
@@ -349,15 +335,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [fleetingThoughts, setFleetingThoughts] = useState<FleetingThought[]>([]);
   const [followedUsers, setFollowedUsers] = useState<Set<string>>(new Set(["u4", "u5"]));
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
-  const [scheduledThoughts, setScheduledThoughts] = useState<ScheduledThought[]>([]);
-  const scheduledRef = useRef<ScheduledThought[]>([]);
-  useEffect(() => { scheduledRef.current = scheduledThoughts; }, [scheduledThoughts]);
   const reportLog = useRef<number[]>([]);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [t, c, n, mood, banner, lang, fl, followed, user, sched, rlog, blocked] = await Promise.all([
+        const [t, c, n, mood, banner, lang, fl, followed, user, rlog, blocked] = await Promise.all([
           AsyncStorage.getItem(KEYS.THOUGHTS),
           AsyncStorage.getItem(KEYS.COMMENTS),
           AsyncStorage.getItem(KEYS.NOTIFICATIONS),
@@ -367,7 +350,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(KEYS.FLEETING),
           AsyncStorage.getItem(KEYS.FOLLOWED),
           AsyncStorage.getItem(KEYS.USER),
-          AsyncStorage.getItem(KEYS.SCHEDULED),
           AsyncStorage.getItem(KEYS.REPORTLOG),
           AsyncStorage.getItem(KEYS.BLOCKED),
         ]);
@@ -384,7 +366,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         if (followed) setFollowedUsers(new Set(JSON.parse(followed)));
         if (user) setCurrentUser({ ...defaultUser, ...JSON.parse(user) });
-        if (sched) setScheduledThoughts(JSON.parse(sched));
         if (rlog) reportLog.current = JSON.parse(rlog);
         if (blocked) { const arr = JSON.parse(blocked); if (Array.isArray(arr)) setBlockedUsers(arr); }
       } catch {}
@@ -517,45 +498,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return true;
   }, []);
 
-  // ─── Scheduled 1 AM Feed thoughts ─────────────────────────────────────────────
+  // ─── Late Night feed: instant posting ─────────────────────────────────────────
 
-  const saveScheduled = useCallback((list: ScheduledThought[]) => {
-    AsyncStorage.setItem(KEYS.SCHEDULED, JSON.stringify(list)).catch(() => {});
-  }, []);
-
-  /** Returns the next 1:00 AM in local time. If it's already past 1 AM today, schedules tomorrow. */
-  const nextOneAM = useCallback((): Date => {
-    const now = new Date();
-    const target = new Date(now);
-    target.setHours(1, 0, 0, 0);
-    if (now.getTime() >= target.getTime()) target.setDate(target.getDate() + 1);
-    return target;
-  }, []);
-
-  const scheduleNightThought = useCallback((content: string): ScheduledThought => {
-    const item: ScheduledThought = {
-      id: "sch_" + Date.now().toString() + Math.random().toString(36).substr(2, 4),
-      content: content.trim(),
+  const postNightThought = useCallback((content: string): boolean => {
+    // Authoritative window guard: Late Night is open 10 PM–4 AM local time.
+    const h = new Date().getHours();
+    if (!(h >= 22 || h < 4)) return false;
+    const item = recomputeScore({
+      id: "night_" + Date.now().toString() + Math.random().toString(36).slice(2, 6),
+      content: `#overthink ${content.trim()}`,
       authorId: currentUser.id,
       authorName: currentUser.displayName,
       authorUsername: currentUser.username,
-      publishAt: nextOneAM().toISOString(),
-      createdAt: new Date().toISOString(),
-    };
-    setScheduledThoughts(prev => { const next = [item, ...prev]; saveScheduled(next); return next; });
-    return item;
-  }, [currentUser, nextOneAM, saveScheduled]);
-
-  const editScheduledThought = useCallback((id: string, content: string) => {
-    setScheduledThoughts(prev => {
-      const next = prev.map(s => s.id !== id ? s : { ...s, content: content.trim() });
-      saveScheduled(next); return next;
+      postingMode: "Pseudonymous", alias: currentUser.username,
+      category: "Night", appreciations: 0, disagreements: 0, reposts: 0, saves: 0, comments: 0,
+      reportCount: 0, qualityScore: 0, createdAt: new Date().toISOString(), isEdited: false,
+      hasAppreciated: false, hasDisagreed: false, hasSaved: false, hasReposted: false, hasReported: false,
+      type: "standard", feedReason: "Shared to the Late Night feed",
     });
-  }, [saveScheduled]);
-
-  const deleteScheduledThought = useCallback((id: string) => {
-    setScheduledThoughts(prev => { const next = prev.filter(s => s.id !== id); saveScheduled(next); return next; });
-  }, [saveScheduled]);
+    setThoughts(prev => { const next = [item, ...prev]; saveThoughts(next); return next; });
+    return true;
+  }, [currentUser, saveThoughts]);
 
   // ─── Thought CRUD ────────────────────────────────────────────────────────────
 
@@ -711,44 +674,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const markAllRead = useCallback(() => setNotifications(prev => prev.map(n => ({ ...n, read: true }))), []);
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  // ─── Publish tick: move due scheduled thoughts into the live 1 AM Feed ─────────
-  useEffect(() => {
-    const publishDue = () => {
-      const now = Date.now();
-      const prev = scheduledRef.current;
-      const due = prev.filter(s => new Date(s.publishAt).getTime() <= now);
-      if (due.length === 0) return;
-      setThoughts(tPrev => {
-        const seen = new Set(tPrev.map(t => t.id));
-        const published: Thought[] = due
-          .filter(s => (seen.has(s.id) ? false : (seen.add(s.id), true)))
-          .map(s => recomputeScore({
-            id: s.id, content: `#overthink ${s.content}`,
-            authorId: s.authorId, authorName: s.authorName, authorUsername: s.authorUsername,
-            postingMode: "Pseudonymous", alias: s.authorUsername,
-            category: "Night", appreciations: 0, disagreements: 0, reposts: 0, saves: 0, comments: 0,
-            reportCount: 0, qualityScore: 0, createdAt: s.publishAt, isEdited: false,
-            hasAppreciated: false, hasDisagreed: false, hasSaved: false, hasReposted: false, hasReported: false,
-            type: "standard", feedReason: "Posted to 1 AM Feed",
-          }));
-        if (published.length === 0) return tPrev;
-        const next = [...published, ...tPrev];
-        saveThoughts(next);
-        return next;
-      });
-      setScheduledThoughts(sPrev => {
-        const remaining = sPrev.filter(s => new Date(s.publishAt).getTime() > now);
-        if (remaining.length === sPrev.length) return sPrev;
-        scheduledRef.current = remaining;
-        saveScheduled(remaining);
-        return remaining;
-      });
-    };
-    publishDue();
-    const id = setInterval(publishDue, 30_000);
-    return () => clearInterval(id);
-  }, [saveThoughts, saveScheduled]);
-
   return (
     <AppContext.Provider value={{
       thoughts, comments, notifications, currentUser, unreadCount,
@@ -760,7 +685,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addThought, editThought, deleteThought,
       toggleAppreciate, toggleDisagree, toggleSave, toggleRepost, reportThought,
       votePoll, addComment, toggleCommentAppreciate, reportComment,
-      scheduledThoughts, scheduleNightThought, editScheduledThought, deleteScheduledThought,
+      postNightThought,
       markAllRead,
     }}>
       {children}
