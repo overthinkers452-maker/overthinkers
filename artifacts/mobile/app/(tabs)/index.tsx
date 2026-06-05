@@ -69,10 +69,15 @@ export default function HomeScreen() {
         <Text style={styles.logo}>overthinkers</Text>
         <TouchableOpacity
           style={styles.bellBtn}
-          onPress={() => router.push("/search")}
+          onPress={() => router.push("/(tabs)/notifications")}
           activeOpacity={0.8}
         >
-          <Feather name="search" size={22} color={colors.foreground} />
+          <Feather name="bell" size={22} color={colors.foreground} />
+          {unreadCount > 0 && (
+            <View style={[styles.bellBadge, { backgroundColor: colors.primary }]}>
+              <Text style={styles.bellBadgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 

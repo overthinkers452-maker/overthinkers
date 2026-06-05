@@ -19,17 +19,17 @@ function NativeTabLayout() {
         <Icon sf={{ default: "house", selected: "house.fill" }} />
         <Label>Feed</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="discover">
-        <Icon sf={{ default: "safari", selected: "safari.fill" }} />
-        <Label>Discover</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="notifications">
-        <Icon sf={{ default: "bell", selected: "bell.fill" }} />
-        <Label>Alerts</Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="latenight">
         <Icon sf={{ default: "moon.stars", selected: "moon.stars.fill" }} />
         <Label>1 AM</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="search">
+        <Icon sf={{ default: "magnifyingglass", selected: "magnifyingglass" }} />
+        <Label>Search</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="discover">
+        <Icon sf={{ default: "safari", selected: "safari.fill" }} />
+        <Label>Discover</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person.circle", selected: "person.circle.fill" }} />
@@ -48,13 +48,8 @@ function ClassicTabLayout() {
   const isWeb = Platform.OS === "web";
   const { unreadCount } = useApp();
 
-  const tabBarHeight = isWeb
-    ? 84
-    : TAB_BAR_CONTENT_HEIGHT + insets.bottom;
-
-  const tabBarPaddingBottom = isWeb
-    ? 16
-    : insets.bottom + 6;
+  const tabBarHeight = isWeb ? 84 : TAB_BAR_CONTENT_HEIGHT + insets.bottom;
+  const tabBarPaddingBottom = isWeb ? 16 : insets.bottom + 6;
 
   return (
     <Tabs
@@ -80,16 +75,13 @@ function ClassicTabLayout() {
         },
         tabBarBackground: () =>
           isIOS ? (
-            <BlurView
-              intensity={80}
-              tint={isDark ? "dark" : "light"}
-              style={StyleSheet.absoluteFill}
-            />
+            <BlurView intensity={80} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
           ) : isWeb ? (
             <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.card }]} />
           ) : null,
       }}
     >
+      {/* 1 — Feed */}
       <Tabs.Screen
         name="index"
         options={{
@@ -102,46 +94,8 @@ function ClassicTabLayout() {
             ),
         }}
       />
-      <Tabs.Screen
-        name="discover"
-        options={{
-          title: "Discover",
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView name={focused ? "safari.fill" : "safari"} tintColor={color} size={21} />
-            ) : (
-              <Feather name="compass" size={21} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          title: "Alerts",
-          tabBarIcon: ({ color, focused }) => (
-            <View>
-              {isIOS ? (
-                <SymbolView name={focused ? "bell.fill" : "bell"} tintColor={color} size={21} />
-              ) : (
-                <Feather name="bell" size={21} color={color} />
-              )}
-              {unreadCount > 0 && (
-                <View style={{
-                  position: "absolute",
-                  top: -4, right: -7,
-                  backgroundColor: colors.disagree,
-                  borderRadius: 8, minWidth: 16, height: 16,
-                  alignItems: "center", justifyContent: "center", paddingHorizontal: 3,
-                }}>
-                  <Text style={{ color: "#fff", fontSize: 10, fontFamily: "Inter_700Bold" }}>
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </Text>
-                </View>
-              )}
-            </View>
-          ),
-        }}
-      />
+
+      {/* 2 — 1 AM */}
       <Tabs.Screen
         name="latenight"
         options={{
@@ -157,6 +111,36 @@ function ClassicTabLayout() {
           tabBarActiveTintColor: "#C4B5FD",
         }}
       />
+
+      {/* 3 — Search */}
+      <Tabs.Screen
+        name="search"
+        options={{
+          title: "Search",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="magnifyingglass" tintColor={color} size={21} />
+            ) : (
+              <Feather name="search" size={21} color={color} />
+            ),
+        }}
+      />
+
+      {/* 4 — Discover */}
+      <Tabs.Screen
+        name="discover"
+        options={{
+          title: "Discover",
+          tabBarIcon: ({ color, focused }) =>
+            isIOS ? (
+              <SymbolView name={focused ? "safari.fill" : "safari"} tintColor={color} size={21} />
+            ) : (
+              <Feather name="compass" size={21} color={color} />
+            ),
+        }}
+      />
+
+      {/* 5 — Profile */}
       <Tabs.Screen
         name="profile"
         options={{
@@ -169,13 +153,21 @@ function ClassicTabLayout() {
             ),
         }}
       />
+
+      {/* Hidden — Notifications (navigable but not shown in tab bar) */}
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
+          title: "Alerts",
+          tabBarIcon: ({ color }) => <Feather name="bell" size={21} color={color} />,
+        }}
+      />
     </Tabs>
   );
 }
 
 export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
+  if (isLiquidGlassAvailable()) return <NativeTabLayout />;
   return <ClassicTabLayout />;
 }
