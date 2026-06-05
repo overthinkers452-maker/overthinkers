@@ -1,118 +1,70 @@
 import React, { useState, useMemo } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  FlatList,
-  Platform,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  TextInput, FlatList, Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { useApp } from "@/context/AppContext";
 import { ThoughtCard } from "@/components/ThoughtCard";
 import { formatCount } from "@/utils/format";
 
 type DiscoverTab = "Explore" | "Leaderboard";
-
 const TRENDING_SEARCHES = ["consciousness", "AI relationships", "free will", "loneliness", "identity"];
+const CATEGORIES_GRID = ["Psychology","Society","Relationships","Tech","Creativity","Philosophy","Culture","Science","Politics","Health"];
+const BADGE_COLORS: Record<string, string> = { Elder: "#FBBF24", Insightful: "#C084FC", Thoughtful: "#818CF8", Newcomer: "#6EE7B7" };
+const AVATAR_BG_POOL = ["#C8F5D8","#C8D8FF","#E8C8FF","#FFE8C8","#C8FFEE","#FFD8E8"];
+function avatarBg(index: number) { return AVATAR_BG_POOL[index % AVATAR_BG_POOL.length]; }
 
-const CATEGORIES_GRID = [
-  "Psychology", "Society", "Relationships", "Tech",
-  "Creativity", "Philosophy", "Culture", "Science", "Politics", "Health",
-];
-
-const BADGE_COLORS: Record<string, string> = {
-  Elder:      "#FBBF24",
-  Insightful: "#C084FC",
-  Thoughtful: "#818CF8",
-  Newcomer:   "#6EE7B7",
-};
-
-const AVATAR_BG_POOL = ["#C8F5D8", "#C8D8FF", "#E8C8FF", "#FFE8C8", "#C8FFEE", "#FFD8E8"];
-function avatarBg(index: number): string {
-  return AVATAR_BG_POOL[index % AVATAR_BG_POOL.length];
-}
-
-/** Section 32 — Leaderboard: rank non-anonymous authors by total appreciations */
 function buildLeaderboard(thoughts: ReturnType<typeof useApp>["thoughts"]) {
-  const totals: Record<string, { name: string; username: string; appreciated: number; badge: string }> = {};
-
+  const totals: Record<string, { name: string; username: string; appreciated: number; badge: string; authorId: string }> = {};
   for (const t of thoughts) {
     if (t.postingMode === "Anonymous") continue;
     const key = t.authorId;
     const display = t.postingMode === "Pseudonymous" ? (t.alias || t.authorName) : t.authorName;
-    if (!totals[key]) {
-      totals[key] = { name: display, username: t.authorUsername, appreciated: 0, badge: "Newcomer" };
-    }
+    if (!totals[key]) totals[key] = { name: display, username: t.authorUsername, appreciated: 0, badge: "Newcomer", authorId: t.authorId };
     totals[key].appreciated += t.appreciations;
   }
-
-  const sorted = Object.entries(totals)
-    .map(([id, v]) => ({ id, ...v }))
-    .sort((a, b) => b.appreciated - a.appreciated);
-
-  return sorted.map((entry, i) => {
-    let badge = "Newcomer";
-    if (entry.appreciated >= 2000) badge = "Elder";
-    else if (entry.appreciated >= 1000) badge = "Insightful";
-    else if (entry.appreciated >= 300) badge = "Thoughtful";
-    return { ...entry, rank: i + 1, badge };
-  });
+  return Object.entries(totals)
+    .map(([_id, v]) => v)
+    .sort((a, b) => b.appreciated - a.appreciated)
+    .map((entry, i) => ({
+      ...entry,
+      rank: i + 1,
+      badge: entry.appreciated >= 2000 ? "Elder" : entry.appreciated >= 1000 ? "Insightful" : entry.appreciated >= 300 ? "Thoughtful" : "Newcomer",
+    }));
 }
 
 export default function DiscoverScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { thoughts } = useApp();
+  const router = useRouter();
+  const { thoughts, followedUsers, toggleFollowUser } = useApp();
   const [activeTab, setActiveTab] = useState<DiscoverTab>("Explore");
   const [search, setSearch] = useState("");
-  const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : 56 + insets.bottom;
 
-  /** Section 32 — live leaderboard computed from AppContext thoughts */
   const leaderboard = useMemo(() => buildLeaderboard(thoughts), [thoughts]);
   const top3 = leaderboard.slice(0, 3);
   const rest = leaderboard.slice(3);
 
-  const trendingThoughts = useMemo(
-    () => [...thoughts].sort((a, b) => b.qualityScore - a.qualityScore).slice(0, 4),
-    [thoughts]
-  );
+  const trendingThoughts = useMemo(() => [...thoughts].sort((a, b) => b.qualityScore - a.qualityScore).slice(0, 4), [thoughts]);
 
-  /** Category grid: count thoughts per category */
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const t of thoughts) {
-      const key = t.category;
-      counts[key] = (counts[key] || 0) + 1;
-    }
+    for (const t of thoughts) counts[t.category] = (counts[t.category] || 0) + 1;
     return counts;
   }, [thoughts]);
 
   const searchResults = useMemo(() => {
     if (!search.trim()) return null;
     const q = search.toLowerCase();
-    return thoughts.filter(t =>
-      t.content.toLowerCase().includes(q) ||
-      t.category.toLowerCase().includes(q) ||
-      t.authorName.toLowerCase().includes(q) ||
-      (t.alias || "").toLowerCase().includes(q)
-    );
+    return thoughts.filter(t => t.content.toLowerCase().includes(q) || t.category.toLowerCase().includes(q) || t.authorName.toLowerCase().includes(q) || (t.alias || "").toLowerCase().includes(q));
   }, [thoughts, search]);
-
-  const toggleFollow = (id: string) => {
-    setFollowedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
 
   const styles = makeStyles(colors);
 
@@ -122,56 +74,23 @@ export default function DiscoverScreen() {
         <Text style={styles.title}>Discover</Text>
       </View>
 
-      <View style={styles.searchContainer}>
+      <View style={[styles.searchContainer, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
         <Feather name="search" size={15} color={colors.mutedForeground} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search thoughts, topics, people..."
-          placeholderTextColor={colors.mutedForeground}
-          value={search}
-          onChangeText={setSearch}
-          returnKeyType="search"
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch("")}>
-            <Feather name="x" size={15} color={colors.mutedForeground} />
-          </TouchableOpacity>
-        )}
+        <TextInput style={[styles.searchInput, { color: colors.foreground }]} placeholder="Search thoughts, topics, people..." placeholderTextColor={colors.mutedForeground} value={search} onChangeText={setSearch} returnKeyType="search" />
+        {search.length > 0 && <TouchableOpacity onPress={() => setSearch("")}><Feather name="x" size={15} color={colors.mutedForeground} /></TouchableOpacity>}
       </View>
 
       {searchResults ? (
-        <FlatList
-          data={searchResults}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => <ThoughtCard thought={item} showReason={false} />}
-          scrollEnabled={!!searchResults.length}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: bottomPad + 16 }}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Feather name="search" size={28} color={colors.mutedForeground} />
-              <Text style={styles.emptyText}>No results for "{search}"</Text>
-            </View>
-          }
+        <FlatList data={searchResults} keyExtractor={item => item.id} renderItem={({ item }) => <ThoughtCard thought={item} showReason={false} />} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: bottomPad + 16 }}
+          ListEmptyComponent={<View style={styles.emptyState}><Feather name="search" size={28} color={colors.mutedForeground} /><Text style={styles.emptyText}>No results for "{search}"</Text></View>}
         />
       ) : (
         <>
-          <View style={styles.discoverTabBar}>
+          <View style={[styles.discoverTabBar, { borderBottomColor: colors.border }]}>
             {(["Explore", "Leaderboard"] as DiscoverTab[]).map(tab => (
-              <TouchableOpacity
-                key={tab}
-                onPress={() => setActiveTab(tab)}
-                style={[styles.discoverTab, activeTab === tab && styles.discoverTabActive]}
-                activeOpacity={0.7}
-              >
-                <Feather
-                  name={tab === "Explore" ? "compass" : "award"}
-                  size={14}
-                  color={activeTab === tab ? colors.primary : colors.mutedForeground}
-                />
-                <Text style={[styles.discoverTabText, activeTab === tab && styles.discoverTabTextActive]}>
-                  {tab}
-                </Text>
+              <TouchableOpacity key={tab} onPress={() => setActiveTab(tab)} style={[styles.discoverTab, activeTab === tab && styles.discoverTabActive]} activeOpacity={0.7}>
+                <Feather name={tab === "Explore" ? "compass" : "award"} size={14} color={activeTab === tab ? colors.primary : colors.mutedForeground} />
+                <Text style={[styles.discoverTabText, { color: activeTab === tab ? colors.primary : colors.mutedForeground, fontFamily: activeTab === tab ? "Inter_600SemiBold" : "Inter_500Medium" }]}>{tab}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -179,15 +98,10 @@ export default function DiscoverScreen() {
           {activeTab === "Explore" ? (
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: bottomPad + 16 }}>
               <View style={styles.section}>
-                <Text style={styles.sectionLabel}>TRENDING SEARCHES</Text>
+                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>TRENDING SEARCHES</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingRow}>
                   {TRENDING_SEARCHES.map(term => (
-                    <TouchableOpacity
-                      key={term}
-                      onPress={() => setSearch(term)}
-                      style={[styles.trendChip, { borderColor: colors.border, backgroundColor: colors.card }]}
-                      activeOpacity={0.8}
-                    >
+                    <TouchableOpacity key={term} onPress={() => setSearch(term)} style={[styles.trendChip, { borderColor: colors.border, backgroundColor: colors.card }]} activeOpacity={0.8}>
                       <Feather name="trending-up" size={12} color={colors.mutedForeground} />
                       <Text style={[styles.trendChipText, { color: colors.foreground }]}>{term}</Text>
                     </TouchableOpacity>
@@ -196,19 +110,12 @@ export default function DiscoverScreen() {
               </View>
 
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Categories</Text>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Categories</Text>
                 <View style={styles.categoriesGrid}>
                   {CATEGORIES_GRID.map(cat => (
-                    <TouchableOpacity
-                      key={cat}
-                      style={[styles.categoryCard, { borderColor: colors.border, backgroundColor: colors.card }]}
-                      activeOpacity={0.8}
-                      onPress={() => setSearch(cat)}
-                    >
+                    <TouchableOpacity key={cat} style={[styles.categoryCard, { borderColor: colors.border, backgroundColor: colors.card }]} activeOpacity={0.8} onPress={() => setSearch(cat)}>
                       <Text style={[styles.categoryCardName, { color: colors.foreground }]}>{cat}</Text>
-                      <Text style={[styles.categoryCardCount, { color: colors.mutedForeground }]}>
-                        {categoryCounts[cat] || 0} thoughts
-                      </Text>
+                      <Text style={[styles.categoryCardCount, { color: colors.mutedForeground }]}>{categoryCounts[cat] || 0} thoughts</Text>
                       <View style={[styles.categoryCardLine, { backgroundColor: colors.primary }]} />
                     </TouchableOpacity>
                   ))}
@@ -216,11 +123,9 @@ export default function DiscoverScreen() {
               </View>
 
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Trending Now</Text>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Trending Now</Text>
               </View>
-              {trendingThoughts.map(t => (
-                <ThoughtCard key={t.id} thought={t} showReason={true} />
-              ))}
+              {trendingThoughts.map(t => <ThoughtCard key={t.id} thought={t} showReason={true} />)}
             </ScrollView>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: bottomPad + 16 }}>
@@ -228,96 +133,62 @@ export default function DiscoverScreen() {
                 <View style={[styles.podium, { borderBottomColor: colors.border }]}>
                   {/* 2nd place */}
                   {top3[1] ? (
-                    <View style={styles.podiumSide}>
-                      <View style={[styles.podiumAvatarSm, { backgroundColor: avatarBg(1) }]}>
-                        <Text style={styles.podiumInitialsSm}>{top3[1].name.slice(0, 2).toUpperCase()}</Text>
-                      </View>
-                      <View style={[styles.rankBadgeSm, { backgroundColor: "#7A7A90" }]}>
-                        <Text style={styles.rankBadgeText}>#2</Text>
-                      </View>
+                    <TouchableOpacity style={styles.podiumSide} activeOpacity={0.8} onPress={() => router.push({ pathname: "/profile/[userId]", params: { userId: top3[1].authorId, name: top3[1].name } })}>
+                      <View style={[styles.podiumAvatarSm, { backgroundColor: avatarBg(1) }]}><Text style={styles.podiumInitialsSm}>{top3[1].name.slice(0,2).toUpperCase()}</Text></View>
+                      <View style={[styles.rankBadgeSm, { backgroundColor: "#7A7A90" }]}><Text style={styles.rankBadgeText}>#2</Text></View>
                       <Text style={styles.podiumName} numberOfLines={1}>{top3[1].name}</Text>
-                      <View style={[styles.podiumBadgeChip, { backgroundColor: (BADGE_COLORS[top3[1].badge] || "#818CF8") + "30" }]}>
-                        <Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[1].badge] || "#818CF8" }]}>{top3[1].badge}</Text>
-                      </View>
+                      <View style={[styles.podiumBadgeChip, { backgroundColor: (BADGE_COLORS[top3[1].badge]||"#818CF8")+"30" }]}><Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[1].badge]||"#818CF8" }]}>{top3[1].badge}</Text></View>
                       <Text style={[styles.podiumCount, { color: colors.mutedForeground }]}>{formatCount(top3[1].appreciated)} appreciated</Text>
-                    </View>
+                    </TouchableOpacity>
                   ) : <View style={styles.podiumSide} />}
 
                   {/* 1st place */}
-                  <View style={styles.podiumCenter}>
+                  <TouchableOpacity style={styles.podiumCenter} activeOpacity={0.8} onPress={() => router.push({ pathname: "/profile/[userId]", params: { userId: top3[0].authorId, name: top3[0].name } })}>
                     <Text style={[styles.podiumFirstLabel, { color: colors.foreground }]}>1st</Text>
-                    <View style={[styles.podiumAvatarLg, { backgroundColor: avatarBg(0) }]}>
-                      <Text style={styles.podiumInitialsLg}>{top3[0].name.slice(0, 2).toUpperCase()}</Text>
-                    </View>
-                    <View style={[styles.rankBadgeLg, { backgroundColor: "#F59E0B" }]}>
-                      <Text style={styles.rankBadgeText}>#1</Text>
-                    </View>
+                    <View style={[styles.podiumAvatarLg, { backgroundColor: avatarBg(0) }]}><Text style={styles.podiumInitialsLg}>{top3[0].name.slice(0,2).toUpperCase()}</Text></View>
+                    <View style={[styles.rankBadgeLg, { backgroundColor: "#F59E0B" }]}><Text style={styles.rankBadgeText}>#1</Text></View>
                     <Text style={[styles.podiumName, { fontFamily: "Inter_700Bold", fontSize: 14, color: colors.foreground }]}>{top3[0].name}</Text>
-                    <View style={[styles.podiumBadgeChip, { backgroundColor: (BADGE_COLORS[top3[0].badge] || "#FBBF24") + "30" }]}>
-                      <Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[0].badge] || "#FBBF24" }]}>{top3[0].badge}</Text>
-                    </View>
+                    <View style={[styles.podiumBadgeChip, { backgroundColor: (BADGE_COLORS[top3[0].badge]||"#FBBF24")+"30" }]}><Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[0].badge]||"#FBBF24" }]}>{top3[0].badge}</Text></View>
                     <Text style={[styles.podiumCount, { color: colors.mutedForeground }]}>{formatCount(top3[0].appreciated)} appreciated</Text>
-                  </View>
+                  </TouchableOpacity>
 
                   {/* 3rd place */}
                   {top3[2] ? (
-                    <View style={styles.podiumSide}>
-                      <View style={[styles.podiumAvatarSm, { backgroundColor: avatarBg(2) }]}>
-                        <Text style={styles.podiumInitialsSm}>{top3[2].name.slice(0, 2).toUpperCase()}</Text>
-                      </View>
-                      <View style={[styles.rankBadgeSm, { backgroundColor: "#9088CC" }]}>
-                        <Text style={styles.rankBadgeText}>#3</Text>
-                      </View>
+                    <TouchableOpacity style={styles.podiumSide} activeOpacity={0.8} onPress={() => router.push({ pathname: "/profile/[userId]", params: { userId: top3[2].authorId, name: top3[2].name } })}>
+                      <View style={[styles.podiumAvatarSm, { backgroundColor: avatarBg(2) }]}><Text style={styles.podiumInitialsSm}>{top3[2].name.slice(0,2).toUpperCase()}</Text></View>
+                      <View style={[styles.rankBadgeSm, { backgroundColor: "#9088CC" }]}><Text style={styles.rankBadgeText}>#3</Text></View>
                       <Text style={styles.podiumName} numberOfLines={1}>{top3[2].name}</Text>
-                      <View style={[styles.podiumBadgeChip, { backgroundColor: (BADGE_COLORS[top3[2].badge] || "#C084FC") + "30" }]}>
-                        <Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[2].badge] || "#C084FC" }]}>{top3[2].badge}</Text>
-                      </View>
+                      <View style={[styles.podiumBadgeChip, { backgroundColor: (BADGE_COLORS[top3[2].badge]||"#C084FC")+"30" }]}><Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[2].badge]||"#C084FC" }]}>{top3[2].badge}</Text></View>
                       <Text style={[styles.podiumCount, { color: colors.mutedForeground }]}>{formatCount(top3[2].appreciated)} appreciated</Text>
-                    </View>
+                    </TouchableOpacity>
                   ) : <View style={styles.podiumSide} />}
                 </View>
               )}
 
               {leaderboard.length === 0 && (
-                <View style={styles.emptyState}>
-                  <Feather name="award" size={28} color={colors.mutedForeground} />
-                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                    No public authors yet. The leaderboard populates as people post.
-                  </Text>
-                </View>
+                <View style={styles.emptyState}><Feather name="award" size={28} color={colors.mutedForeground} /><Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No public authors yet.</Text></View>
               )}
 
               {rest.map(user => {
-                const followed = followedIds.has(user.id);
+                const followed = followedUsers.has(user.authorId);
                 const badgeColor = BADGE_COLORS[user.badge] || "#818CF8";
                 return (
-                  <View key={user.id} style={[styles.rankRow, { borderBottomColor: colors.border }]}>
+                  <TouchableOpacity key={user.authorId} onPress={() => router.push({ pathname: "/profile/[userId]", params: { userId: user.authorId, name: user.name } })} style={[styles.rankRow, { borderBottomColor: colors.border }]} activeOpacity={0.8}>
                     <Text style={[styles.rankNum, { color: colors.mutedForeground }]}>#{user.rank}</Text>
                     <View style={[styles.rankAvatar, { backgroundColor: avatarBg(user.rank) }]}>
-                      <Text style={[styles.rankAvatarText, { color: "#2D2D50" }]}>{user.name.slice(0, 2).toUpperCase()}</Text>
+                      <Text style={[styles.rankAvatarText, { color: "#2D2D50" }]}>{user.name.slice(0,2).toUpperCase()}</Text>
                     </View>
                     <View style={styles.rankInfo}>
                       <Text style={[styles.rankName, { color: colors.foreground }]} numberOfLines={1}>{user.name}</Text>
                       <View style={styles.rankMeta}>
-                        <View style={[styles.rankBadgeChip, { backgroundColor: badgeColor + "25" }]}>
-                          <Text style={[styles.rankBadgeLabel, { color: badgeColor }]}>{user.badge}</Text>
-                        </View>
+                        <View style={[styles.rankBadgeChip, { backgroundColor: badgeColor+"25" }]}><Text style={[styles.rankBadgeLabel, { color: badgeColor }]}>{user.badge}</Text></View>
                         <Text style={[styles.rankCount, { color: colors.mutedForeground }]}>{formatCount(user.appreciated)} appreciated</Text>
                       </View>
                     </View>
-                    <TouchableOpacity
-                      onPress={() => toggleFollow(user.id)}
-                      style={[styles.followBtn, {
-                        backgroundColor: followed ? "transparent" : colors.primary,
-                        borderColor: followed ? colors.border : colors.primary,
-                      }]}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.followText, { color: followed ? colors.foreground : "#fff" }]}>
-                        {followed ? "Following" : "Follow"}
-                      </Text>
+                    <TouchableOpacity onPress={() => toggleFollowUser(user.authorId)} style={[styles.followBtn, { backgroundColor: followed ? "transparent" : colors.primary, borderColor: followed ? colors.border : colors.primary }]} activeOpacity={0.8}>
+                      <Text style={[styles.followText, { color: followed ? colors.foreground : "#fff" }]}>{followed ? "Following" : "Follow"}</Text>
                     </TouchableOpacity>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </ScrollView>
@@ -333,44 +204,24 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     container: { flex: 1, backgroundColor: colors.background },
     header: { paddingHorizontal: 16, paddingVertical: 10 },
     title: { fontSize: 22, fontFamily: "Inter_700Bold", color: colors.foreground, letterSpacing: -0.5 },
-    searchContainer: {
-      flexDirection: "row", alignItems: "center",
-      marginHorizontal: 14, marginBottom: 4,
-      paddingHorizontal: 12, paddingVertical: 10,
-      backgroundColor: colors.secondary,
-      borderRadius: 10, borderWidth: 1, borderColor: colors.border, gap: 8,
-    },
-    searchInput: { flex: 1, fontSize: 14, color: colors.foreground, fontFamily: "Inter_400Regular", padding: 0 },
-    discoverTabBar: {
-      flexDirection: "row", borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: 16,
-    },
-    discoverTab: {
-      flexDirection: "row", alignItems: "center", gap: 6,
-      paddingHorizontal: 12, paddingVertical: 10,
-      borderBottomWidth: 2, borderBottomColor: "transparent", marginBottom: -1,
-    },
+    searchContainer: { flexDirection: "row", alignItems: "center", marginHorizontal: 14, marginBottom: 4, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1, gap: 8 },
+    searchInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", padding: 0 },
+    discoverTabBar: { flexDirection: "row", borderBottomWidth: 1, paddingHorizontal: 16 },
+    discoverTab: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: "transparent", marginBottom: -1 },
     discoverTabActive: { borderBottomColor: colors.primary },
-    discoverTabText: { fontSize: 14, color: colors.mutedForeground, fontFamily: "Inter_500Medium" },
-    discoverTabTextActive: { color: colors.primary, fontFamily: "Inter_600SemiBold" },
+    discoverTabText: { fontSize: 14 },
     section: { paddingHorizontal: 16, paddingTop: 12 },
-    sectionLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 },
-    sectionTitle: { fontSize: 17, fontFamily: "Inter_700Bold", color: colors.foreground, marginBottom: 10 },
+    sectionLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 },
+    sectionTitle: { fontSize: 17, fontFamily: "Inter_700Bold", marginBottom: 10 },
     trendingRow: { paddingBottom: 4, gap: 8 },
-    trendChip: {
-      flexDirection: "row", alignItems: "center", gap: 5,
-      borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
-    },
+    trendChip: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
     trendChipText: { fontSize: 13, fontFamily: "Inter_400Regular" },
     categoriesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 4 },
     categoryCard: { width: "47%", borderWidth: 1, borderRadius: 10, padding: 12, overflow: "hidden" },
     categoryCardName: { fontSize: 14, fontFamily: "Inter_600SemiBold", marginBottom: 3 },
     categoryCardCount: { fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 10 },
     categoryCardLine: { height: 3, width: 28, borderRadius: 2, marginTop: 4 },
-    podium: {
-      flexDirection: "row", alignItems: "flex-end",
-      paddingHorizontal: 20, paddingTop: 24, paddingBottom: 16,
-      borderBottomWidth: 1, gap: 8,
-    },
+    podium: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 20, paddingTop: 24, paddingBottom: 16, borderBottomWidth: 1, gap: 8 },
     podiumCenter: { flex: 1, alignItems: "center" },
     podiumSide: { flex: 1, alignItems: "center", paddingTop: 20 },
     podiumFirstLabel: { fontSize: 18, fontFamily: "Inter_700Bold", marginBottom: 6 },
@@ -385,11 +236,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     podiumBadgeChip: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 3 },
     podiumBadgeText: { fontSize: 11, fontFamily: "Inter_500Medium" },
     podiumCount: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "center" },
-    rankRow: {
-      flexDirection: "row", alignItems: "center",
-      paddingHorizontal: 16, paddingVertical: 12,
-      borderBottomWidth: 1, gap: 10,
-    },
+    rankRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, gap: 10 },
     rankNum: { fontSize: 13, fontFamily: "Inter_600SemiBold", width: 28 },
     rankAvatar: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center" },
     rankAvatarText: { fontSize: 14, fontFamily: "Inter_700Bold" },
