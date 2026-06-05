@@ -10,5 +10,5 @@ export function useColors() {
     effectiveScheme === "dark" && "dark" in colors
       ? (colors as Record<string, typeof colors.light>).dark
       : colors.light;
-  return palette;
+  return {  ...palette, radius}
 }
