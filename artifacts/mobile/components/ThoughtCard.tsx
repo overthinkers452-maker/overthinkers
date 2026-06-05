@@ -12,8 +12,10 @@ import { formatCount, timeAgo, withinEditWindow } from "@/utils/format";
 import { useFeedback } from "@/hooks/useFeedback";
 import { useBounce } from "@/hooks/useBounce";
 import { useSettings } from "@/context/SettingsContext";
-import { useModal } from "@/context/ModalContext";
-import { modeLabel } from "@/utils/i18n";
+import { useModal, type SheetAction } from "@/context/ModalContext";
+import { useToast } from "@/context/ToastContext";
+import { modeLabel, t } from "@/utils/i18n";
+import { translateText } from "@/utils/translate";
 
 interface Props { thought: Thought; showReason?: boolean; }
 
@@ -24,9 +26,9 @@ function getAvatarColor(name: string) {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
 }
 
-const LANGUAGES = [
+const LANGUAGES: { code: string; label: string; roman?: boolean }[] = [
   { code: "hi", label: "Hindi" },
-  { code: "hi", label: "Hinglish" },
+  { code: "hi", label: "Hinglish", roman: true },
   { code: "es", label: "Spanish" },
   { code: "fr", label: "French" },
   { code: "de", label: "German" },
@@ -43,10 +45,11 @@ const LANGUAGES = [
 export function ThoughtCard({ thought, showReason = true }: Props) {
   const colors = useColors();
   const router = useRouter();
-  const { toggleAppreciate, toggleDisagree, toggleSave, toggleRepost, reportThought, deleteThought, currentUser, translateLang, setTranslateLang } = useApp();
+  const { toggleAppreciate, toggleDisagree, toggleSave, toggleRepost, reportThought, deleteThought, currentUser, translateLang, setTranslateLang, blockUser } = useApp();
   const { tap, select } = useFeedback();
-  const { appLanguage } = useSettings();
+  const { appLanguage, hideDisagreements } = useSettings();
   const modal = useModal();
+  const { showToast } = useToast();
   const { scale: heartScale, bounce: heartBounce } = useBounce();
   const { scale: saveScale, bounce: saveBounce } = useBounce();
 
@@ -77,17 +80,13 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
   }, [isAnon, thought.authorId, currentUser.id, authorDisplay, router]);
 
   // ─── Feature 6: Translate ──────────────────────────────────────────────────
-  const doTranslate = useCallback(async (lang: { code: string; label: string }) => {
+  const doTranslate = useCallback(async (lang: { code: string; label: string; roman?: boolean }) => {
     if (translatedText && showTranslation) { setShowTranslation(false); return; }
     if (translatedText) { setShowTranslation(true); return; }
     setTranslating(true);
     try {
-      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(thought.content)}&langpair=en|${lang.code}`);
-      const data = await res.json();
-      setTranslatedText(data?.responseData?.translatedText || "Translation unavailable.");
-      setShowTranslation(true);
-    } catch {
-      setTranslatedText("Translation unavailable offline.");
+      const result = await translateText(thought.content, lang);
+      setTranslatedText(result);
       setShowTranslation(true);
     } finally {
       setTranslating(false);
@@ -147,18 +146,40 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
           },
         ],
       });
-    } else if (thought.hasReported) {
-      modal.alert({ title: "Already reported", message: "Our moderation team is reviewing this thought." });
     } else {
-      modal.report({
-        title: "Report this thought",
-        onSubmit: (reason, description) => {
-          const res = reportThought(thought.id, reason.label, description);
-          modal.alert({ title: res.ok ? "Thanks for reporting" : "Couldn't report", message: res.message });
-        },
-      });
+      const actions: SheetAction[] = [];
+      if (thought.hasReported) {
+        actions.push({ label: "Already reported — under review", icon: "check", disabled: true });
+      } else {
+        actions.push({
+          label: "Report thought", icon: "flag",
+          onPress: () => modal.report({
+            title: "Report this thought",
+            onSubmit: (reason, description) => {
+              const res = reportThought(thought.id, reason.label, description);
+              modal.alert({ title: res.ok ? "Thanks for reporting" : "Couldn't report", message: res.message });
+            },
+          }),
+        });
+      }
+      if (!isAnon) {
+        actions.push({
+          label: `Block ${authorDisplay}`, icon: "slash", destructive: true,
+          onPress: () => modal.confirm({
+            title: `Block ${authorDisplay}?`,
+            message: "You won't see their thoughts in your feeds anymore. You can unblock them in Settings.",
+            confirmText: "Block",
+            destructive: true,
+            onConfirm: () => {
+              blockUser(thought.authorId, authorDisplay);
+              showToast(t(appLanguage, "toast.userBlocked"), { type: "success" });
+            },
+          }),
+        });
+      }
+      modal.sheet({ title: "Thought options", actions });
     }
-  }, [isOwnThought, thought, router, reportThought, deleteThought, modal, select]);
+  }, [isOwnThought, thought, isAnon, authorDisplay, router, reportThought, deleteThought, blockUser, showToast, appLanguage, modal, select]);
 
   const s = makeStyles(colors);
 
@@ -230,10 +251,12 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
           </Animated.View>
           <Text style={[s.actionCount, thought.hasAppreciated && { color: colors.appreciate }]}>{formatCount(thought.appreciations)}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onDisagree} style={s.actionBtn} activeOpacity={0.7}>
-          <Feather name="minus-circle" size={16} color={thought.hasDisagreed ? colors.disagree : colors.mutedForeground} />
-          <Text style={[s.actionCount, thought.hasDisagreed && { color: colors.disagree }]}>{formatCount(thought.disagreements)}</Text>
-        </TouchableOpacity>
+        {!hideDisagreements && (
+          <TouchableOpacity onPress={onDisagree} style={s.actionBtn} activeOpacity={0.7}>
+            <Feather name="minus-circle" size={16} color={thought.hasDisagreed ? colors.disagree : colors.mutedForeground} />
+            <Text style={[s.actionCount, thought.hasDisagreed && { color: colors.disagree }]}>{formatCount(thought.disagreements)}</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={onPress} style={s.actionBtn} activeOpacity={0.7}>
           <Feather name="message-circle" size={16} color={colors.mutedForeground} />
           <Text style={s.actionCount}>{formatCount(thought.comments)}</Text>

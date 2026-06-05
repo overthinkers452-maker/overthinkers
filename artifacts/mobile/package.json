@@ -54,5 +54,13 @@
     "typescript": "~5.9.2",
     "zod": "catalog:",
     "zod-validation-error": "^3.4.0"
+  },
+  "dependencies": {
+    "dijkstrajs": "^1.0.3",
+    "expo-clipboard": "~8.0.8",
+    "expo-file-system": "~19.0.23",
+    "expo-localization": "~17.0.9",
+    "expo-sharing": "~14.0.8",
+    "react-native-qrcode-svg": "^6.3.21"
   }
 }

@@ -13,6 +13,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { SettingsProvider } from "@/context/SettingsContext";
 import { ModalProvider } from "@/context/ModalContext";
+import { ToastProvider } from "@/context/ToastContext";
 import { AppProvider } from "@/context/AppContext";
 
 SplashScreen.preventAutoHideAsync();
@@ -51,9 +52,11 @@ export default function RootLayout() {
               <AppProvider>
                 <GestureHandlerRootView>
                   <KeyboardProvider>
-                    <ModalProvider>
-                      <RootLayoutNav />
-                    </ModalProvider>
+                    <ToastProvider>
+                      <ModalProvider>
+                        <RootLayoutNav />
+                      </ModalProvider>
+                    </ToastProvider>
                   </KeyboardProvider>
                 </GestureHandlerRootView>
               </AppProvider>

@@ -198,19 +198,11 @@ export default function ProfileScreen() {
         ListHeaderComponent={
           <View>
             {/* Banner */}
-            <TouchableOpacity
-              onPress={() => { tap(); setEditField("banner"); }}
-              activeOpacity={0.85}
-              style={[styles.banner, { backgroundColor: bannerColor + "40" }]}
-            >
+            <View style={[styles.banner, { backgroundColor: bannerColor + "40" }]}>
               {currentUser.bannerUri ? (
                 <Image source={{ uri: currentUser.bannerUri }} style={styles.bannerImage} resizeMode="cover" />
               ) : null}
-              <View style={styles.bannerOverlay}>
-                <Feather name="edit-3" size={13} color="#fff" />
-                <Text style={styles.bannerEditHint}>Edit banner</Text>
-              </View>
-            </TouchableOpacity>
+            </View>
 
             {/* Avatar + fleeting ring */}
             <View style={styles.avatarSection}>
@@ -552,10 +544,8 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     title: { fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
     headerActions: { flexDirection: "row", gap: 8 },
     iconBtn: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", borderWidth: 1 },
-    banner: { height: 100, alignItems: "flex-end", justifyContent: "flex-end", padding: 10, overflow: "hidden" },
+    banner: { height: 100, overflow: "hidden" },
     bannerImage: { ...StyleSheet.absoluteFillObject, width: "100%", height: "100%" },
-    bannerOverlay: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-    bannerEditHint: { fontSize: 11, color: "#fff", fontFamily: "Inter_500Medium" },
     avatarSection: { flexDirection: "row", alignItems: "flex-end", gap: 12, paddingHorizontal: 16, marginTop: -28, marginBottom: 12 },
     fleetingRing: { borderWidth: 3, borderRadius: 42, padding: 2 },
     avatar: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center" },

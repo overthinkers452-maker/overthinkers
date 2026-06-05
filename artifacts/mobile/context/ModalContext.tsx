@@ -81,12 +81,17 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
 
   const translateY = useRef(new Animated.Value(600)).current;
   const backdrop = useRef(new Animated.Value(0)).current;
+  // True only while a close is the latest intent. A chained open() (e.g. sheet
+  // action -> confirm) flips this back to false so the interrupted close
+  // animation's completion callback can't clear the freshly opened modal.
+  const closingRef = useRef(false);
 
   // Report-flow local state
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [description, setDescription] = useState("");
 
   const open = useCallback((m: ModalKind) => {
+    closingRef.current = false;
     setModal(m);
     setReason(null);
     setDescription("");
@@ -94,10 +99,14 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const close = useCallback(() => {
+    closingRef.current = true;
     Animated.parallel([
       Animated.timing(translateY, { toValue: 600, duration: 200, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
       Animated.timing(backdrop, { toValue: 0, duration: 200, useNativeDriver: true }),
     ]).start(() => {
+      // A chained open() (sheet -> confirm/report) flips closingRef to false;
+      // in that case keep the newly opened modal instead of clearing it.
+      if (!closingRef.current) return;
       setVisible(false);
       setModal(null);
     });

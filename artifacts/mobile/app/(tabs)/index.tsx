@@ -14,7 +14,9 @@ import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useApp, Thought, FeedType } from "@/context/AppContext";
+import { useSettings } from "@/context/SettingsContext";
 import { ThoughtCard } from "@/components/ThoughtCard";
+import { applyFeedFilters } from "@/utils/feedFilter";
 
 type FeedTypeNew = "For You" | "Trending" | "Latest" | "Following";
 const FEED_TYPES: FeedTypeNew[] = ["For You", "Trending", "Latest", "Following"];
@@ -25,7 +27,8 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { thoughts, unreadCount } = useApp();
+  const { thoughts, unreadCount, isBlocked, currentUser } = useApp();
+  const { blockedWords } = useSettings();
   const [activeFeed, setActiveFeed] = useState<FeedTypeNew>("For You");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,7 +54,7 @@ export default function HomeScreen() {
     if (activeCategory) {
       base = base.filter(t => t.category.toLowerCase() === activeCategory.toLowerCase());
     }
-    return base;
+    return applyFeedFilters(base, { blockedWords, isBlocked, currentUserId: currentUser.id });
   };
 
   const filteredThoughts = getFiltered();

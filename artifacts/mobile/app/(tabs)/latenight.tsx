@@ -7,9 +7,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useApp, ScheduledThought } from "@/context/AppContext";
+import { useSettings } from "@/context/SettingsContext";
 import { formatCount, timeAgo } from "@/utils/format";
 import { useFeedback } from "@/hooks/useFeedback";
 import { useModal } from "@/context/ModalContext";
+import { applyFeedFilters } from "@/utils/feedFilter";
 
 // ─── Time helpers ─────────────────────────────────────────────────────────────
 
@@ -290,9 +292,10 @@ const nc = StyleSheet.create({
 export default function LateNightScreen() {
   const insets = useSafeAreaInsets();
   const {
-    thoughts, currentUser, toggleAppreciate,
+    thoughts, currentUser, toggleAppreciate, isBlocked,
     scheduledThoughts, scheduleNightThought, editScheduledThought, deleteScheduledThought,
   } = useApp();
+  const { blockedWords } = useSettings();
   const { tap, success } = useFeedback();
   const modal = useModal();
 
@@ -304,8 +307,11 @@ export default function LateNightScreen() {
 
   // Published night thoughts = any thought containing #overthink
   const nightThoughts = useMemo(
-    () => thoughts.filter(t => t.content.toLowerCase().includes("#overthink")),
-    [thoughts]
+    () => applyFeedFilters(
+      thoughts.filter(t => t.content.toLowerCase().includes("#overthink")),
+      { blockedWords, isBlocked, currentUserId: currentUser.id }
+    ),
+    [thoughts, blockedWords, isBlocked, currentUser.id]
   );
 
   // The current user's pending (scheduled, not yet posted) thoughts

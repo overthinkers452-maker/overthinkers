@@ -122,7 +122,9 @@ export interface ProfileUpdate {
   bannerUri?: string | null;
 }
 
-export interface TranslateLang { code: string; label: string; }
+export interface TranslateLang { code: string; label: string; roman?: boolean; }
+
+export interface BlockedUser { id: string; name: string; }
 
 interface AppContextType {
   thoughts: Thought[];
@@ -140,6 +142,10 @@ interface AppContextType {
   addFleetingThought: (content: string) => void;
   followedUsers: Set<string>;
   toggleFollowUser: (userId: string) => void;
+  blockedUsers: BlockedUser[];
+  blockUser: (userId: string, name: string) => void;
+  unblockUser: (userId: string) => void;
+  isBlocked: (userId: string) => boolean;
   updateProfile: (update: ProfileUpdate) => ReportResult;
   canChangeUsername: () => { allowed: boolean; nextChangeAt?: string };
   addThought: (thought: Omit<Thought, "id"|"createdAt"|"qualityScore"|"appreciations"|"disagreements"|"reposts"|"saves"|"comments"|"reportCount"|"hasAppreciated"|"hasDisagreed"|"hasSaved"|"hasReposted"|"hasReported"|"isEdited"|"editedAt"|"isRepost"|"originalAuthorName"|"originalAuthorId">) => void;
@@ -320,6 +326,7 @@ const KEYS = {
   USER: "@overthinkers/currentUser/v1",
   SCHEDULED: "@overthinkers/scheduledNight/v1",
   REPORTLOG: "@overthinkers/reportLog/v1",
+  BLOCKED: "@overthinkers/blockedUsers/v1",
 };
 
 const USERNAME_COOLDOWN_MS = 14 * 24 * 3600000; // once per 2 weeks
@@ -341,6 +348,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [translateLang, setTranslateLangState] = useState<TranslateLang | null>(null);
   const [fleetingThoughts, setFleetingThoughts] = useState<FleetingThought[]>([]);
   const [followedUsers, setFollowedUsers] = useState<Set<string>>(new Set(["u4", "u5"]));
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [scheduledThoughts, setScheduledThoughts] = useState<ScheduledThought[]>([]);
   const scheduledRef = useRef<ScheduledThought[]>([]);
   useEffect(() => { scheduledRef.current = scheduledThoughts; }, [scheduledThoughts]);
@@ -349,7 +357,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const [t, c, n, mood, banner, lang, fl, followed, user, sched, rlog] = await Promise.all([
+        const [t, c, n, mood, banner, lang, fl, followed, user, sched, rlog, blocked] = await Promise.all([
           AsyncStorage.getItem(KEYS.THOUGHTS),
           AsyncStorage.getItem(KEYS.COMMENTS),
           AsyncStorage.getItem(KEYS.NOTIFICATIONS),
@@ -361,6 +369,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(KEYS.USER),
           AsyncStorage.getItem(KEYS.SCHEDULED),
           AsyncStorage.getItem(KEYS.REPORTLOG),
+          AsyncStorage.getItem(KEYS.BLOCKED),
         ]);
         if (t) setThoughts(JSON.parse(t));
         if (c) setComments(JSON.parse(c));
@@ -377,6 +386,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (user) setCurrentUser({ ...defaultUser, ...JSON.parse(user) });
         if (sched) setScheduledThoughts(JSON.parse(sched));
         if (rlog) reportLog.current = JSON.parse(rlog);
+        if (blocked) { const arr = JSON.parse(blocked); if (Array.isArray(arr)) setBlockedUsers(arr); }
       } catch {}
     };
     load();
@@ -427,6 +437,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, []);
+
+  const blockUser = useCallback((userId: string, name: string) => {
+    setBlockedUsers(prev => {
+      if (prev.some(b => b.id === userId)) return prev;
+      const next = [...prev, { id: userId, name }];
+      AsyncStorage.setItem(KEYS.BLOCKED, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+    setFollowedUsers(prev => {
+      if (!prev.has(userId)) return prev;
+      const next = new Set(prev);
+      next.delete(userId);
+      AsyncStorage.setItem(KEYS.FOLLOWED, JSON.stringify([...next])).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const unblockUser = useCallback((userId: string) => {
+    setBlockedUsers(prev => {
+      const next = prev.filter(b => b.id !== userId);
+      AsyncStorage.setItem(KEYS.BLOCKED, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const isBlocked = useCallback((userId: string) => blockedUsers.some(b => b.id === userId), [blockedUsers]);
 
   // ─── Profile editing ─────────────────────────────────────────────────────────
 
@@ -719,6 +755,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       moodEmoji, setMoodEmoji, bannerColor, setBannerColor,
       translateLang, setTranslateLang, fleetingThoughts, addFleetingThought,
       followedUsers, toggleFollowUser,
+      blockedUsers, blockUser, unblockUser, isBlocked,
       updateProfile, canChangeUsername,
       addThought, editThought, deleteThought,
       toggleAppreciate, toggleDisagree, toggleSave, toggleRepost, reportThought,
