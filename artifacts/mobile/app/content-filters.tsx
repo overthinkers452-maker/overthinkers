@@ -8,6 +8,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { useToast } from "@/context/ToastContext";
 import { useFeedback } from "@/hooks/useFeedback";
 import { t } from "@/utils/i18n";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
 export default function ContentFiltersScreen() {
   const colors = useColors();
@@ -42,7 +43,7 @@ export default function ContentFiltersScreen() {
         headerTitleStyle: { fontFamily: "Inter_600SemiBold", color: colors.foreground } as any,
         headerTintColor: colors.primary,
       }} />
-      <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollViewCompat style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }} keyboardShouldPersistTaps="handled">
         <Text style={styles.desc}>{t(appLanguage, "filters.desc")}</Text>
 
         <View style={[styles.inputRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -83,7 +84,7 @@ export default function ContentFiltersScreen() {
             ))}
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollViewCompat>
     </>
   );
 }

@@ -20,6 +20,7 @@ import { ModeSelector } from "@/components/ModeSelector";
 import { useFeedback } from "@/hooks/useFeedback";
 import { useSettings } from "@/context/SettingsContext";
 import { modeLabel } from "@/utils/i18n";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
 const CATEGORIES = [
   "Philosophy", "Technology", "Culture", "Psychology",
@@ -125,7 +126,7 @@ export default function ComposeScreen() {
         ),
       }} />
 
-      <ScrollView
+      <KeyboardAwareScrollViewCompat
         style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPad + 20 }]}
         keyboardShouldPersistTaps="handled"
@@ -281,7 +282,7 @@ export default function ComposeScreen() {
             </View>
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollViewCompat>
     </>
   );
 }

@@ -13,6 +13,7 @@ import { ThoughtCard } from "@/components/ThoughtCard";
 import { formatCount } from "@/utils/format";
 import { useFeedback } from "@/hooks/useFeedback";
 import { useModal } from "@/context/ModalContext";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 
 type ProfileTab = "Thoughts" | "Saved";
 const PROFILE_TABS: ProfileTab[] = ["Thoughts", "Saved"];
@@ -390,6 +391,7 @@ export default function ProfileScreen() {
 
       {/* ─── Text field editor (name / username / bio) ───────────────────── */}
       <Modal visible={editField === "name" || editField === "username" || editField === "bio"} transparent animationType="slide" onRequestClose={() => setEditField(null)}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setEditField(null)}>
           <TouchableOpacity activeOpacity={1} style={[styles.pickerSheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[styles.pickerHandle, { backgroundColor: colors.border }]} />
@@ -428,6 +430,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ─── Avatar / Banner image picker (suggested + gallery) ──────────── */}
@@ -508,6 +511,7 @@ export default function ProfileScreen() {
 
       {/* Fleeting thought compose modal */}
       <Modal visible={showFleetingCompose} transparent animationType="slide" onRequestClose={() => setShowFleetingCompose(false)}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowFleetingCompose(false)}>
           <View style={[styles.pickerSheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[styles.pickerHandle, { backgroundColor: colors.border }]} />
@@ -532,6 +536,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

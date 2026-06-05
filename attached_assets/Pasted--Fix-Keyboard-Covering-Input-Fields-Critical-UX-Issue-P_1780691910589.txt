@@ -1,0 +1,66 @@
+[ ] Fix Keyboard Covering Input Fields (Critical UX Issue)
+
+Problem:
+When a user starts typing in any text input field (Comment Box, Thought Box, Reply Box, Search Box, Edit Profile Fields, Chat Input, or any other text-entry component), the on-screen keyboard appears and pushes the active input field underneath the keyboard.
+
+This causes the text field, cursor, and typed content to become partially or completely hidden, creating a poor user experience.
+
+Required Fix:
+
+• Detect whenever the software keyboard opens.
+• Automatically move, resize, or scroll the screen so the currently focused input field remains fully visible.
+• Ensure the active text field is always positioned above the keyboard.
+• The blinking cursor must never be hidden behind the keyboard.
+• Users must always be able to see what they are typing in real time.
+• The keyboard must never overlap the active input area.
+
+Behavior Requirements:
+
+1. Comment Boxes
+   
+   - When typing a comment, the comment field must automatically move above the keyboard.
+   - The entire input area must remain visible.
+
+2. Thought Composer
+   
+   - While creating or editing a thought, the composer must stay visible above the keyboard.
+   - Long thoughts should scroll naturally without hiding the cursor.
+
+3. Reply Inputs
+   
+   - Reply fields must automatically reposition when focused.
+
+4. Search Inputs
+   
+   - Search bars must remain visible during typing.
+
+5. Profile/Edit Forms
+   
+   - Every editable field must remain visible while typing.
+
+6. Chat or Messaging Inputs
+   
+   - Message composer must stay docked directly above the keyboard.
+
+Technical Requirements:
+
+• Implement proper Keyboard Avoidance behavior across the entire application.
+• Handle both Android and iOS devices.
+• Support different keyboard heights.
+• Support gesture navigation and traditional navigation bars.
+• Handle orientation changes correctly.
+• Respect safe-area insets.
+• Prevent layout jumping, flickering, clipping, or sudden screen shifts.
+• Maintain smooth animations when the keyboard appears and disappears.
+• Automatically scroll to the focused input if necessary.
+• Ensure nested scroll views, modals, bottom sheets, dialogs, and overlays also behave correctly.
+
+Acceptance Criteria:
+
+✓ No text input field can ever be hidden behind the keyboard.
+✓ Cursor remains visible at all times.
+✓ Users can always see the content they are typing.
+✓ Smooth keyboard appearance and dismissal.
+✓ Works consistently across all screens, forms, modals, bottom sheets, comments, thoughts, replies, chats, and search inputs.
+✓ No manual scrolling should be required to reveal the focused input field.
+✓ Production-ready behavior matching top-tier apps such as Instagram, WhatsApp, X, Reddit, Threads, and Facebook.

@@ -9,6 +9,7 @@ import { useToast } from "@/context/ToastContext";
 import { useFeedback } from "@/hooks/useFeedback";
 import { t } from "@/utils/i18n";
 import { passwordStrength } from "@/utils/security";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
 export default function ChangePasswordScreen() {
   const colors = useColors();
@@ -44,21 +45,6 @@ export default function ChangePasswordScreen() {
     router.back();
   };
 
-  const Field = ({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) => (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        secureTextEntry={!show}
-        autoCapitalize="none"
-        autoCorrect={false}
-        style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
-        placeholderTextColor={colors.mutedForeground}
-      />
-    </View>
-  );
-
   const canSubmit = next.length > 0 && confirm.length > 0 && (!hasPassword || current.length > 0);
 
   return (
@@ -69,7 +55,7 @@ export default function ChangePasswordScreen() {
         headerTitleStyle: { fontFamily: "Inter_600SemiBold", color: colors.foreground } as any,
         headerTintColor: colors.primary,
       }} />
-      <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollViewCompat style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }} keyboardShouldPersistTaps="handled">
         {!hasPassword && (
           <View style={[styles.notice, { backgroundColor: colors.secondary }]}>
             <Feather name="info" size={15} color={colors.primary} />
@@ -77,8 +63,8 @@ export default function ChangePasswordScreen() {
           </View>
         )}
 
-        {hasPassword && <Field label={t(appLanguage, "password.current")} value={current} onChange={setCurrent} />}
-        <Field label={t(appLanguage, "password.new")} value={next} onChange={setNext} />
+        {hasPassword && <PasswordField label={t(appLanguage, "password.current")} value={current} onChange={setCurrent} secure={!show} colors={colors} styles={styles} />}
+        <PasswordField label={t(appLanguage, "password.new")} value={next} onChange={setNext} secure={!show} colors={colors} styles={styles} />
 
         {next.length > 0 && (
           <View style={styles.strengthRow}>
@@ -89,7 +75,7 @@ export default function ChangePasswordScreen() {
           </View>
         )}
 
-        <Field label={t(appLanguage, "password.confirm")} value={confirm} onChange={setConfirm} />
+        <PasswordField label={t(appLanguage, "password.confirm")} value={confirm} onChange={setConfirm} secure={!show} colors={colors} styles={styles} />
 
         <TouchableOpacity onPress={() => setShow((s) => !s)} style={styles.showRow} activeOpacity={0.7}>
           <Feather name={show ? "eye-off" : "eye"} size={15} color={colors.mutedForeground} />
@@ -106,8 +92,32 @@ export default function ChangePasswordScreen() {
         <TouchableOpacity onPress={onSubmit} disabled={!canSubmit} style={[styles.submit, { backgroundColor: canSubmit ? colors.primary : colors.secondary }]} activeOpacity={0.85}>
           <Text style={[styles.submitText, { color: canSubmit ? "#fff" : colors.mutedForeground }]}>{t(appLanguage, "password.title")}</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </KeyboardAwareScrollViewCompat>
     </>
+  );
+}
+
+function PasswordField({ label, value, onChange, secure, colors, styles }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  secure: boolean;
+  colors: ReturnType<typeof useColors>;
+  styles: ReturnType<typeof makeStyles>;
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        secureTextEntry={secure}
+        autoCapitalize="none"
+        autoCorrect={false}
+        style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+        placeholderTextColor={colors.mutedForeground}
+      />
+    </View>
   );
 }
 

@@ -11,6 +11,7 @@ import { formatCount, timeAgo } from "@/utils/format";
 import { useFeedback } from "@/hooks/useFeedback";
 import { useModal } from "@/context/ModalContext";
 import { applyFeedFilters } from "@/utils/feedFilter";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 
 // ─── Time helpers ─────────────────────────────────────────────────────────────
 
@@ -121,7 +122,7 @@ function ComposeModal({ visible, onClose, onSubmit }: {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={cm.overlay}>
+      <KeyboardAvoidingView style={cm.overlay} behavior="padding">
         <View style={cm.sheet}>
           <View style={cm.handle} />
           <View style={cm.headerRow}>
@@ -163,7 +164,7 @@ function ComposeModal({ visible, onClose, onSubmit }: {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
