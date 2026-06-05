@@ -342,6 +342,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [fleetingThoughts, setFleetingThoughts] = useState<FleetingThought[]>([]);
   const [followedUsers, setFollowedUsers] = useState<Set<string>>(new Set(["u4", "u5"]));
   const [scheduledThoughts, setScheduledThoughts] = useState<ScheduledThought[]>([]);
+  const scheduledRef = useRef<ScheduledThought[]>([]);
+  useEffect(() => { scheduledRef.current = scheduledThoughts; }, [scheduledThoughts]);
   const reportLog = useRef<number[]>([]);
 
   useEffect(() => {
@@ -676,13 +678,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ─── Publish tick: move due scheduled thoughts into the live 1 AM Feed ─────────
   useEffect(() => {
     const publishDue = () => {
-      setScheduledThoughts(prev => {
-        const now = Date.now();
-        const due = prev.filter(s => new Date(s.publishAt).getTime() <= now);
-        if (due.length === 0) return prev;
-        const remaining = prev.filter(s => new Date(s.publishAt).getTime() > now);
-        setThoughts(tPrev => {
-          const published: Thought[] = due.map(s => recomputeScore({
+      const now = Date.now();
+      const prev = scheduledRef.current;
+      const due = prev.filter(s => new Date(s.publishAt).getTime() <= now);
+      if (due.length === 0) return;
+      setThoughts(tPrev => {
+        const seen = new Set(tPrev.map(t => t.id));
+        const published: Thought[] = due
+          .filter(s => (seen.has(s.id) ? false : (seen.add(s.id), true)))
+          .map(s => recomputeScore({
             id: s.id, content: `#overthink ${s.content}`,
             authorId: s.authorId, authorName: s.authorName, authorUsername: s.authorUsername,
             postingMode: "Pseudonymous", alias: s.authorUsername,
@@ -691,10 +695,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             hasAppreciated: false, hasDisagreed: false, hasSaved: false, hasReposted: false, hasReported: false,
             type: "standard", feedReason: "Posted to 1 AM Feed",
           }));
-          const next = [...published, ...tPrev];
-          saveThoughts(next);
-          return next;
-        });
+        if (published.length === 0) return tPrev;
+        const next = [...published, ...tPrev];
+        saveThoughts(next);
+        return next;
+      });
+      setScheduledThoughts(sPrev => {
+        const remaining = sPrev.filter(s => new Date(s.publishAt).getTime() > now);
+        if (remaining.length === sPrev.length) return sPrev;
+        scheduledRef.current = remaining;
         saveScheduled(remaining);
         return remaining;
       });

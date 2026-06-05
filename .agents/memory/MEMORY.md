@@ -1,1 +1,2 @@
 - [Metro phantom SyntaxError](metro-stale-cache.md) — Metro Babel parse error that tsc + standalone babel-parser can't reproduce = stale transform cache; clear metro cache + restart.
+- [AppContext state-updater purity](overthinkers-state-updaters.md) — overthinkers uses React Compiler; never nest setState in another updater. Past-due scheduled thought crashed returning users.
