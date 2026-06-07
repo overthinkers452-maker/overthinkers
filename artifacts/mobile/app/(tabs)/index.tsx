@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   FlatList,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -27,7 +28,7 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { thoughts, unreadCount, isBlocked, currentUser } = useApp();
+  const { thoughts, unreadCount, isBlocked, currentUser, feedLoading, refreshFeed, loadMoreFeed, hasMoreFeed, followingIds } = useApp();
   const { blockedWords } = useSettings();
   const [activeFeed, setActiveFeed] = useState<FeedTypeNew>("For You");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -40,7 +41,9 @@ export default function HomeScreen() {
     let base: Thought[];
     switch (activeFeed) {
       case "Following":
-        base = thoughts.filter(t => ["u4", "u5"].includes(t.authorId));
+        base = followingIds.length > 0
+          ? thoughts.filter(t => followingIds.includes(t.authorId))
+          : [];
         break;
       case "Trending":
         base = [...thoughts].sort((a, b) => b.appreciations - a.appreciations);
@@ -59,10 +62,19 @@ export default function HomeScreen() {
 
   const filteredThoughts = getFiltered();
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 800);
-  }, []);
+    await refreshFeed(activeFeed as any, activeCategory).catch(() => {});
+    setRefreshing(false);
+  }, [refreshFeed, activeFeed, activeCategory]);
+
+  const onEndReached = useCallback(() => {
+    loadMoreFeed(activeFeed as any, activeCategory);
+  }, [loadMoreFeed, activeFeed, activeCategory]);
+
+  useEffect(() => {
+    refreshFeed(activeFeed as any, activeCategory);
+  }, [activeFeed, activeCategory]);
 
   const styles = makeStyles(colors);
 
@@ -138,6 +150,12 @@ export default function HomeScreen() {
         </ScrollView>
       </View>
 
+      {feedLoading && !refreshing && (
+        <View style={{ alignItems: "center", paddingVertical: 12 }}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      )}
+
       <FlatList
         data={filteredThoughts}
         keyExtractor={item => item.id}
@@ -151,6 +169,13 @@ export default function HomeScreen() {
             onRefresh={onRefresh}
             tintColor={colors.primary}
           />
+        }
+        onEndReached={onEndReached}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={
+          hasMoreFeed && filteredThoughts.length > 0
+            ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
+            : null
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>

@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, Pressable, Modal,
-  ActivityIndicator, ScrollView, Animated,
+  ActivityIndicator, ScrollView, Animated, Share,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -123,6 +123,18 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
   const onSave       = useCallback(() => { tap(); saveBounce(); toggleSave(thought.id); }, [thought.id, toggleSave, tap, saveBounce]);
   const onRepost     = useCallback(() => { tap(); toggleRepost(thought.id); }, [thought.id, toggleRepost, tap]);
   const onPress      = useCallback(() => router.push({ pathname: "/thought/[id]", params: { id: thought.id } }), [thought.id, router]);
+
+  const onShare = useCallback(async () => {
+    tap();
+    try {
+      await Share.share({
+        message: thought.content,
+        title: "A thought from overthinkers",
+      });
+    } catch {
+      // user dismissed or not supported — silently ignore
+    }
+  }, [tap, thought.content]);
 
   const onMenuPress = useCallback(() => {
     select();
@@ -270,6 +282,9 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
             <Feather name="bookmark" size={16} color={thought.hasSaved ? colors.gold : colors.mutedForeground} />
           </Animated.View>
           <Text style={[s.actionCount, thought.hasSaved && { color: colors.gold }]}>{formatCount(thought.saves)}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onShare} style={s.actionBtn} activeOpacity={0.7}>
+          <Feather name="share" size={16} color={colors.mutedForeground} />
         </TouchableOpacity>
       </View>
 

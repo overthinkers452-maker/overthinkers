@@ -47,28 +47,49 @@ export default function NotificationsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { notifications, markAllRead } = useApp();
+  const { notifications, markAllRead, refreshNotifications } = useApp();
+
+  useEffect(() => {
+    refreshNotifications();
+  }, []);
   const [filter, setFilter] = useState<Filter>("All");
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : 56 + insets.bottom;
 
+  // Mark all read when user visits the tab (after a short delay for animation)
   useEffect(() => {
-    const timer = setTimeout(markAllRead, 2000);
+    const hasUnread = notifications.some(n => !n.read);
+    if (!hasUnread) return;
+    const timer = setTimeout(markAllRead, 1500);
     return () => clearTimeout(timer);
-  }, [markAllRead]);
+  }, [markAllRead, notifications]);
 
   const filtered = notifications.filter(n => notifMatchesFilter(n, filter));
   const styles = makeStyles(colors);
+
+  const onNotifPress = (item: Notification) => {
+    if (item.thoughtId) {
+      router.push({ pathname: "/thought/[id]", params: { id: item.thoughtId } });
+    } else if (item.actorId && item.type === "follow") {
+      router.push({ pathname: "/profile/[userId]", params: { userId: item.actorId } });
+    }
+  };
 
   const renderItem = ({ item }: { item: Notification }) => {
     const bg = NOTIFICATION_BG[item.type];
     const iconColor = NOTIFICATION_COLOR[item.type];
     const icon = NOTIFICATION_ICON[item.type];
     const isBadge = item.type === "badge";
+    const tappable = !!(item.thoughtId || (item.actorId && item.type === "follow"));
 
     return (
-      <View style={[styles.item, !item.read && { backgroundColor: colors.primary + "06" }]}>
+      <TouchableOpacity
+        onPress={() => onNotifPress(item)}
+        activeOpacity={tappable ? 0.7 : 1}
+        disabled={!tappable}
+        style={[styles.item, !item.read && { backgroundColor: colors.primary + "06" }]}
+      >
         <View style={[styles.iconCircle, { backgroundColor: bg }]}>
           <Feather name={icon} size={17} color={iconColor} />
         </View>
@@ -88,7 +109,8 @@ export default function NotificationsScreen() {
           )}
           <Text style={[styles.timeText, { color: colors.mutedForeground }]}>{timeAgo(item.createdAt)}</Text>
         </View>
-      </View>
+        {tappable && <Feather name="chevron-right" size={15} color={colors.mutedForeground} />}
+      </TouchableOpacity>
     );
   };
 

@@ -1,57 +1,71 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity,
-  ScrollView, Platform,
+  ScrollView, Platform, ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/useColors";
-import { useApp } from "@/context/AppContext";
+import { useApp, Thought } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
 import { ThoughtCard } from "@/components/ThoughtCard";
 import { formatCount } from "@/utils/format";
+import * as svc from "@/lib/thoughtsService";
 
 const TRENDING = ["consciousness", "AI relationships", "free will", "loneliness", "identity", "productivity"];
 type ResultTab = "Thoughts" | "People";
+
+interface PersonResult {
+  id: string;
+  display_name: string;
+  username: string;
+  bio: string | null;
+  avatar_url: string | null;
+  followers_count: number;
+  thoughts_count: number;
+}
 
 export default function SearchTabScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { thoughts, followedUsers, toggleFollowUser } = useApp();
+  const { followedUsers, toggleFollowUser } = useApp();
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<ResultTab>("Thoughts");
+  const [thoughtResults, setThoughtResults] = useState<Thought[]>([]);
+  const [peopleResults, setPeopleResults] = useState<PersonResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : 56 + insets.bottom;
 
-  const thoughtResults = useMemo(() => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    return thoughts.filter(t =>
-      t.content.toLowerCase().includes(q) ||
-      t.category.toLowerCase().includes(q) ||
-      t.authorName.toLowerCase().includes(q) ||
-      (t.alias || "").toLowerCase().includes(q)
-    );
-  }, [query, thoughts]);
-
-  const peopleResults = useMemo(() => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    const seen = new Set<string>();
-    const results: { id: string; name: string; username: string; thoughtCount: number; appreciations: number }[] = [];
-    thoughts.forEach(t => {
-      if (t.postingMode === "Anonymous" || seen.has(t.authorId)) return;
-      const name = t.alias || t.authorName;
-      if (name.toLowerCase().includes(q) || t.authorUsername.toLowerCase().includes(q)) {
-        seen.add(t.authorId);
-        const userThoughts = thoughts.filter(x => x.authorId === t.authorId && !x.isRepost);
-        results.push({ id: t.authorId, name, username: t.authorUsername, thoughtCount: userThoughts.length, appreciations: userThoughts.reduce((s, x) => s + x.appreciations, 0) });
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim()) {
+      setThoughtResults([]);
+      setPeopleResults([]);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const [tRes, pRes] = await Promise.all([
+          svc.searchThoughts(query.trim(), user?.id),
+          svc.searchProfiles(query.trim()),
+        ]);
+        setThoughtResults(tRes);
+        setPeopleResults(pRes as PersonResult[]);
+      } catch {
+        // keep previous results
+      } finally {
+        setSearching(false);
       }
-    });
-    return results;
-  }, [query, thoughts]);
+    }, 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query, user?.id]);
 
   const hasQuery = query.trim().length > 0;
   const totalResults = tab === "Thoughts" ? thoughtResults.length : peopleResults.length;
@@ -140,19 +154,19 @@ export default function SearchTabScreen() {
                 const followed = followedUsers.has(item.id);
                 return (
                   <TouchableOpacity
-                    onPress={() => router.push({ pathname: "/profile/[userId]", params: { userId: item.id, name: item.name } })}
+                    onPress={() => router.push({ pathname: "/profile/[userId]", params: { userId: item.id } })}
                     style={[styles.personRow, { borderBottomColor: colors.border }]}
                     activeOpacity={0.8}
                   >
                     <View style={[styles.personAvatar, { backgroundColor: colors.primary + "25" }]}>
                       <Text style={[styles.personInitials, { color: colors.primary }]}>
-                        {item.name.slice(0, 2).toUpperCase()}
+                        {item.display_name.slice(0, 2).toUpperCase()}
                       </Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.personName, { color: colors.foreground }]}>{item.name}</Text>
+                      <Text style={[styles.personName, { color: colors.foreground }]}>{item.display_name}</Text>
                       <Text style={[styles.personMeta, { color: colors.mutedForeground }]}>
-                        {item.thoughtCount} thoughts · {formatCount(item.appreciations)} appreciated
+                        @{item.username} · {item.thoughts_count} thoughts · {formatCount(item.followers_count)} followers
                       </Text>
                     </View>
                     <TouchableOpacity

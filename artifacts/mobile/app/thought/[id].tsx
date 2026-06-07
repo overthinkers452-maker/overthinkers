@@ -131,7 +131,7 @@ export default function ThoughtDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { thoughts, comments, addComment, toggleCommentAppreciate, reportComment, editThought, currentUser } = useApp();
+  const { thoughts, comments, addComment, toggleCommentAppreciate, reportComment, editThought, currentUser, refreshComments } = useApp();
   const { tap } = useFeedback();
   const modal = useModal();
   const { appLanguage } = useSettings();
@@ -146,6 +146,11 @@ export default function ThoughtDetailScreen() {
   const [isEditing, setIsEditing] = useState(edit === "1");
 
   const thought = thoughts.find(t => t.id === id);
+
+  // Load comments from Supabase on mount
+  React.useEffect(() => {
+    if (id) refreshComments(id);
+  }, [id]);
   const allComments = (comments[id!] || []).filter(c => !c.hasReported);
   const threadComments = allComments.filter(c => !c.parentId);
 

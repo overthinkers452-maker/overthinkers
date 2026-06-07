@@ -1,17 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Modal, TextInput, Platform, ScrollView, Animated,
+  Modal, TextInput, Platform, ScrollView, Animated, KeyboardAvoidingView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { useApp } from "@/context/AppContext";
+import { useApp, Thought } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { formatCount, timeAgo } from "@/utils/format";
 import { useFeedback } from "@/hooks/useFeedback";
 import { useModal } from "@/context/ModalContext";
 import { applyFeedFilters } from "@/utils/feedFilter";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import * as svc from "@/lib/thoughtsService";
 
 // ─── Time helpers ─────────────────────────────────────────────────────────────
 
@@ -246,12 +247,15 @@ const nc = StyleSheet.create({
 export default function LateNightScreen() {
   const insets = useSafeAreaInsets();
   const { thoughts, currentUser, toggleAppreciate, isBlocked, postNightThought } = useApp();
+  const { user } = useAuth();
   const { blockedWords } = useSettings();
   const { tap, success } = useFeedback();
   const modal = useModal();
 
   const [showCompose, setShowCompose] = useState(false);
   const [nightOpen, setNightOpen] = useState(() => isNightOpen());
+  const [nightFeed, setNightFeed] = useState<Thought[]>([]);
+  const [loadingNight, setLoadingNight] = useState(false);
 
   // Re-evaluate the open/closed window periodically so the UI flips at 10 PM / 4 AM.
   useEffect(() => {
@@ -259,16 +263,40 @@ export default function LateNightScreen() {
     return () => clearInterval(id);
   }, []);
 
+  // Load night thoughts from Supabase
+  useEffect(() => {
+    if (!user) return;
+    setLoadingNight(true);
+    svc.fetchNightThoughts(user.id)
+      .then(data => { if (data.length > 0) setNightFeed(data); })
+      .catch(() => {})
+      .finally(() => setLoadingNight(false));
+  }, [user]);
+
   const topPad    = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : 56 + insets.bottom;
 
-  // Published night thoughts = any thought containing #overthink
+  // Merge local new night thoughts with server data
+  const localNightThoughts = useMemo(
+    () => thoughts.filter(t => t.content.toLowerCase().includes("#overthink")),
+    [thoughts]
+  );
+
+  const allNightThoughts = useMemo(() => {
+    const merged = [...localNightThoughts];
+    nightFeed.forEach(t => {
+      if (!merged.find(x => x.id === t.id)) merged.push(t);
+    });
+    return merged;
+  }, [localNightThoughts, nightFeed]);
+
+  // Published night thoughts = filtered
   const nightThoughts = useMemo(
     () => applyFeedFilters(
-      thoughts.filter(t => t.content.toLowerCase().includes("#overthink")),
+      allNightThoughts,
       { blockedWords, isBlocked, currentUserId: currentUser.id }
     ),
-    [thoughts, blockedWords, isBlocked, currentUser.id]
+    [allNightThoughts, blockedWords, isBlocked, currentUser.id]
   );
 
   const myNightCount = useMemo(

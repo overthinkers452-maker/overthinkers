@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Platform } from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
+import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { useFeedback } from "@/hooks/useFeedback";
 import { t } from "@/utils/i18n";
@@ -15,37 +16,41 @@ export default function ChangePasswordScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { appLanguage, hasPassword, verifyPassword, setPassword } = useSettings();
+  const { appLanguage } = useSettings();
+  const { changePassword } = useAuth();
   const { showToast } = useToast();
   const { tap } = useFeedback();
   const styles = makeStyles(colors);
   const bottomPad = Platform.OS === "web" ? 32 : insets.bottom + 16;
 
-  const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [show, setShow] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const strength = passwordStrength(next);
   const strengthColors = [colors.destructive, colors.destructive, "#F59E0B", colors.appreciate];
 
-  const onSubmit = () => {
+  const onSubmit = async () => {
     setError(null);
-    if (hasPassword) {
-      if (!verifyPassword(current)) { setError(t(appLanguage, "password.err.current")); return; }
-    }
     if (next.length < 8) { setError(t(appLanguage, "password.err.length")); return; }
-    if (hasPassword && next === current) { setError(t(appLanguage, "password.err.same")); return; }
     if (next !== confirm) { setError(t(appLanguage, "password.err.match")); return; }
 
-    setPassword(next);
+    setLoading(true);
+    const { error: authError } = await changePassword(next);
+    setLoading(false);
+
+    if (authError) {
+      setError(authError.message);
+      return;
+    }
     tap();
-    showToast(t(appLanguage, hasPassword ? "toast.passwordChanged" : "toast.passwordSet"), { type: "success" });
+    showToast(t(appLanguage, "toast.passwordChanged"), { type: "success" });
     router.back();
   };
 
-  const canSubmit = next.length > 0 && confirm.length > 0 && (!hasPassword || current.length > 0);
+  const canSubmit = next.length > 0 && confirm.length > 0 && !loading;
 
   return (
     <>
@@ -56,14 +61,13 @@ export default function ChangePasswordScreen() {
         headerTintColor: colors.primary,
       }} />
       <KeyboardAwareScrollViewCompat style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }} keyboardShouldPersistTaps="handled">
-        {!hasPassword && (
-          <View style={[styles.notice, { backgroundColor: colors.secondary }]}>
-            <Feather name="info" size={15} color={colors.primary} />
-            <Text style={[styles.noticeText, { color: colors.foreground }]}>{t(appLanguage, "password.setFirst")}</Text>
-          </View>
-        )}
+        <View style={[styles.notice, { backgroundColor: colors.secondary }]}>
+          <Feather name="info" size={15} color={colors.primary} />
+          <Text style={[styles.noticeText, { color: colors.foreground }]}>
+            Enter your new password below. You'll stay signed in on this device.
+          </Text>
+        </View>
 
-        {hasPassword && <PasswordField label={t(appLanguage, "password.current")} value={current} onChange={setCurrent} secure={!show} colors={colors} styles={styles} />}
         <PasswordField label={t(appLanguage, "password.new")} value={next} onChange={setNext} secure={!show} colors={colors} styles={styles} />
 
         {next.length > 0 && (
@@ -90,7 +94,9 @@ export default function ChangePasswordScreen() {
         )}
 
         <TouchableOpacity onPress={onSubmit} disabled={!canSubmit} style={[styles.submit, { backgroundColor: canSubmit ? colors.primary : colors.secondary }]} activeOpacity={0.85}>
-          <Text style={[styles.submitText, { color: canSubmit ? "#fff" : colors.mutedForeground }]}>{t(appLanguage, "password.title")}</Text>
+          <Text style={[styles.submitText, { color: canSubmit ? "#fff" : colors.mutedForeground }]}>
+            {loading ? "Saving…" : t(appLanguage, "password.title")}
+          </Text>
         </TouchableOpacity>
       </KeyboardAwareScrollViewCompat>
     </>

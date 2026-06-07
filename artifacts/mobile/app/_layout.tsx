@@ -2,7 +2,7 @@ import {
   Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -15,14 +15,34 @@ import { SettingsProvider } from "@/context/SettingsContext";
 import { ModalProvider } from "@/context/ModalContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { AppProvider } from "@/context/AppContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 
 SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
+
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { session, loading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+    const inAuthGroup = segments[0] === "auth";
+    if (!session && !inAuthGroup) {
+      router.replace("/auth/login");
+    } else if (session && inAuthGroup) {
+      router.replace("/(tabs)");
+    }
+  }, [session, loading, segments]);
+
+  return <>{children}</>;
+}
 
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerBackTitle: "Back" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="auth" options={{ headerShown: false }} />
       <Stack.Screen name="compose" options={{ presentation: "modal", headerShown: true }} />
       <Stack.Screen name="thought/[id]" options={{ headerShown: true }} />
       <Stack.Screen name="profile/[userId]" options={{ headerShown: true }} />
@@ -49,17 +69,21 @@ export default function RootLayout() {
         <ThemeProvider>
           <SettingsProvider>
             <QueryClientProvider client={queryClient}>
-              <AppProvider>
-                <GestureHandlerRootView>
-                  <KeyboardProvider>
-                    <ToastProvider>
-                      <ModalProvider>
-                        <RootLayoutNav />
-                      </ModalProvider>
-                    </ToastProvider>
-                  </KeyboardProvider>
-                </GestureHandlerRootView>
-              </AppProvider>
+              <AuthProvider>
+                <AppProvider>
+                  <GestureHandlerRootView>
+                    <KeyboardProvider>
+                      <ToastProvider>
+                        <ModalProvider>
+                          <AuthGate>
+                            <RootLayoutNav />
+                          </AuthGate>
+                        </ModalProvider>
+                      </ToastProvider>
+                    </KeyboardProvider>
+                  </GestureHandlerRootView>
+                </AppProvider>
+              </AuthProvider>
             </QueryClientProvider>
           </SettingsProvider>
         </ThemeProvider>

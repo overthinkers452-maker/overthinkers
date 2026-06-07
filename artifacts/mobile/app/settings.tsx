@@ -9,6 +9,7 @@ import { Stack, useRouter } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { useTheme, ThemeMode } from "@/context/ThemeContext";
 import { useApp } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
 import { useSettings, APP_LANGUAGES } from "@/context/SettingsContext";
 import { useModal } from "@/context/ModalContext";
 import { useToast } from "@/context/ToastContext";
@@ -34,6 +35,7 @@ export default function SettingsScreen() {
   } = useSettings();
   const modal = useModal();
   const { showToast } = useToast();
+  const { signOut, deleteAccount } = useAuth();
 
   const tr = (key: string, vars?: Record<string, string | number>) => t(appLanguage, key, vars);
 
@@ -261,7 +263,37 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Row label={tr("settings.exportData")} icon="download" onPress={onExport} />
           <Row label={tr("settings.logoutOthers")} icon="log-out" onPress={onLogoutOthers} />
-          <Row label={tr("settings.deleteAccount")} icon="trash-2" danger onPress={() => modal.confirm({ title: tr("settings.deleteAccount"), message: "This will permanently delete all your thoughts and data. This cannot be undone.", confirmText: tr("common.delete"), destructive: true, onConfirm: () => modal.alert({ title: tr("settings.deleteAccount"), message: "Your account has been scheduled for deletion in 30 days." }) })} />
+          <Row
+            label="Sign Out"
+            icon="log-out"
+            danger
+            onPress={() => modal.confirm({
+              title: "Sign Out",
+              message: "You'll be signed out of your account on this device.",
+              confirmText: "Sign Out",
+              destructive: true,
+              onConfirm: async () => { await signOut(); },
+            })}
+          />
+          <Row
+            label={tr("settings.deleteAccount")}
+            icon="trash-2"
+            danger
+            onPress={() => modal.confirm({
+              title: tr("settings.deleteAccount"),
+              message: "This will permanently delete all your thoughts, comments, and account data. This cannot be undone.",
+              confirmText: tr("common.delete"),
+              destructive: true,
+              onConfirm: async () => {
+                const { error } = await deleteAccount();
+                if (error) {
+                  modal.alert({ title: "Couldn't delete account", message: error.message });
+                } else {
+                  showToast("Account deleted.", { type: "success" });
+                }
+              },
+            })}
+          />
         </View>
 
         {/* About */}

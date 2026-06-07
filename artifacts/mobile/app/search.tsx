@@ -1,62 +1,78 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity,
-  ScrollView, Platform,
+  ScrollView, Platform, ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { useApp, Thought } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
 import { ThoughtCard } from "@/components/ThoughtCard";
 import { formatCount } from "@/utils/format";
+import * as svc from "@/lib/thoughtsService";
 
 const TRENDING = ["consciousness", "AI relationships", "free will", "loneliness", "identity", "productivity"];
 
 type ResultTab = "Thoughts" | "People";
 
+interface PersonResult {
+  id: string;
+  name: string;
+  username: string;
+  thoughtCount: number;
+  appreciations: number;
+}
+
 export default function SearchScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { thoughts, followedUsers, toggleFollowUser } = useApp();
+  const { followedUsers, toggleFollowUser } = useApp();
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<ResultTab>("Thoughts");
+  const [thoughtResults, setThoughtResults] = useState<Thought[]>([]);
+  const [peopleResults, setPeopleResults] = useState<PersonResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 16;
 
-  const thoughtResults = useMemo(() => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    return thoughts.filter(t =>
-      t.content.toLowerCase().includes(q) ||
-      t.category.toLowerCase().includes(q) ||
-      t.authorName.toLowerCase().includes(q) ||
-      (t.alias || "").toLowerCase().includes(q)
-    );
-  }, [query, thoughts]);
+  const doSearch = useCallback(async (q: string) => {
+    if (!q.trim()) {
+      setThoughtResults([]);
+      setPeopleResults([]);
+      return;
+    }
+    setLoading(true);
+    const [thoughts, profiles] = await Promise.all([
+      svc.searchThoughts(q, user?.id),
+      svc.searchProfiles(q),
+    ]);
+    setThoughtResults(thoughts);
+    setPeopleResults(profiles.map((p: any) => ({
+      id: p.id,
+      name: p.display_name ?? p.username ?? "Unknown",
+      username: p.username ?? "",
+      thoughtCount: p.thoughts_count ?? 0,
+      appreciations: p.reputation ?? 0,
+    })));
+    setLoading(false);
+  }, [user?.id]);
 
-  const peopleResults = useMemo(() => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    const seen = new Set<string>();
-    const results: { id: string; name: string; username: string; thoughtCount: number; appreciations: number }[] = [];
-    thoughts.forEach(t => {
-      if (t.postingMode === "Anonymous" || seen.has(t.authorId)) return;
-      const name = t.alias || t.authorName;
-      if (name.toLowerCase().includes(q) || t.authorUsername.toLowerCase().includes(q)) {
-        seen.add(t.authorId);
-        const userThoughts = thoughts.filter(x => x.authorId === t.authorId && !x.isRepost);
-        results.push({
-          id: t.authorId,
-          name,
-          username: t.authorUsername,
-          thoughtCount: userThoughts.length,
-          appreciations: userThoughts.reduce((s, x) => s + x.appreciations, 0),
-        });
-      }
-    });
-    return results;
-  }, [query, thoughts]);
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim()) {
+      setThoughtResults([]);
+      setPeopleResults([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    debounceRef.current = setTimeout(() => doSearch(query), 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query, doSearch]);
 
   const styles = makeStyles(colors);
   const hasQuery = query.trim().length > 0;
@@ -64,11 +80,8 @@ export default function SearchScreen() {
 
   return (
     <>
-      <Stack.Screen options={{
-        headerShown: false,
-      }} />
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={[styles.container, { paddingTop: Platform.OS === "web" ? 67 : insets.top, backgroundColor: colors.background }]}>
-        {/* Search bar */}
         <View style={[styles.searchBar, { borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
             <Feather name="arrow-left" size={20} color={colors.foreground} />
@@ -109,7 +122,6 @@ export default function SearchScreen() {
           </ScrollView>
         ) : (
           <>
-            {/* Result tabs */}
             <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
               {(["Thoughts", "People"] as ResultTab[]).map(t => (
                 <TouchableOpacity
@@ -126,7 +138,11 @@ export default function SearchScreen() {
                   )}
                 </TouchableOpacity>
               ))}
-              <Text style={[styles.resultCount, { color: colors.mutedForeground }]}>{totalResults} results</Text>
+              {loading ? (
+                <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: "auto", paddingVertical: 12 }} />
+              ) : (
+                <Text style={[styles.resultCount, { color: colors.mutedForeground }]}>{totalResults} results</Text>
+              )}
             </View>
 
             {tab === "Thoughts" ? (
@@ -137,10 +153,12 @@ export default function SearchScreen() {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: bottomPad }}
                 ListEmptyComponent={
-                  <View style={styles.empty}>
-                    <Feather name="search" size={28} color={colors.mutedForeground} />
-                    <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No thoughts matching "{query}"</Text>
-                  </View>
+                  !loading ? (
+                    <View style={styles.empty}>
+                      <Feather name="search" size={28} color={colors.mutedForeground} />
+                      <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No thoughts matching "{query}"</Text>
+                    </View>
+                  ) : null
                 }
               />
             ) : (
@@ -165,7 +183,7 @@ export default function SearchScreen() {
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.personName, { color: colors.foreground }]}>{item.name}</Text>
                         <Text style={[styles.personMeta, { color: colors.mutedForeground }]}>
-                          {item.thoughtCount} thoughts · {formatCount(item.appreciations)} appreciated
+                          {item.thoughtCount} thoughts · {formatCount(item.appreciations)} rep
                         </Text>
                       </View>
                       <TouchableOpacity
@@ -181,10 +199,12 @@ export default function SearchScreen() {
                   );
                 }}
                 ListEmptyComponent={
-                  <View style={styles.empty}>
-                    <Feather name="users" size={28} color={colors.mutedForeground} />
-                    <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No public users matching "{query}"</Text>
-                  </View>
+                  !loading ? (
+                    <View style={styles.empty}>
+                      <Feather name="users" size={28} color={colors.mutedForeground} />
+                      <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No public users matching "{query}"</Text>
+                    </View>
+                  ) : null
                 }
               />
             )}

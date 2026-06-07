@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   FlatList, Platform, Modal, TextInput, Image,
@@ -9,6 +9,8 @@ import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { useColors } from "@/hooks/useColors";
 import { useApp } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
+import * as svc from "@/lib/thoughtsService";
 import { ThoughtCard } from "@/components/ThoughtCard";
 import { formatCount } from "@/utils/format";
 import { useFeedback } from "@/hooks/useFeedback";
@@ -67,8 +69,9 @@ export default function ProfileScreen() {
   const router = useRouter();
   const {
     thoughts, currentUser, moodEmoji, setMoodEmoji, bannerColor, setBannerColor,
-    fleetingThoughts, addFleetingThought, updateProfile, canChangeUsername,
+    fleetingThoughts, addFleetingThought, canChangeUsername, savedThoughts,
   } = useApp();
+  const { user, updateProfile: updateAuthProfile, refreshProfile } = useAuth();
   const { tap, success } = useFeedback();
   const modal = useModal();
 
@@ -76,6 +79,7 @@ export default function ProfileScreen() {
   const [showMoodPicker, setShowMoodPicker] = useState(false);
   const [showFleetingCompose, setShowFleetingCompose] = useState(false);
   const [fleetingText, setFleetingText] = useState("");
+  const [allMyThoughts, setAllMyThoughts] = useState<import("@/context/AppContext").Thought[]>([]);
 
   // Unified profile edit state
   const [editField, setEditField] = useState<EditField>(null);
@@ -86,9 +90,28 @@ export default function ProfileScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : 56 + insets.bottom;
 
-  const myThoughts = useMemo(() => thoughts.filter(t => t.authorId === currentUser.id), [thoughts, currentUser.id]);
-  const saved = useMemo(() => thoughts.filter(t => t.hasSaved), [thoughts]);
-  const appreciated = useMemo(() => thoughts.filter(t => t.hasAppreciated), [thoughts]);
+  // Fetch all user thoughts for accurate heatmap/streak (not limited by current feed)
+  const fetchAllMyThoughts = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await svc.fetchProfileThoughts(user.id, user.id);
+      setAllMyThoughts(data);
+    } catch {}
+  }, [user]);
+
+  useEffect(() => {
+    fetchAllMyThoughts();
+  }, [fetchAllMyThoughts]);
+
+  const myThoughts = useMemo(
+    () => (allMyThoughts.length > 0 ? allMyThoughts : thoughts.filter(t => t.authorId === currentUser.id)),
+    [allMyThoughts, thoughts, currentUser.id]
+  );
+  const saved = useMemo(() => savedThoughts ?? thoughts.filter(t => t.hasSaved), [savedThoughts, thoughts]);
+  const totalAppreciationsReceived = useMemo(
+    () => myThoughts.reduce((sum, t) => sum + t.appreciations, 0),
+    [myThoughts]
+  );
   const displayThoughts = activeTab === "Thoughts" ? myThoughts : saved;
 
   const heatmap = useMemo(() => buildHeatmap(myThoughts), [myThoughts]);
@@ -103,8 +126,8 @@ export default function ProfileScreen() {
   }, [heatmap]);
 
   const achievements = useMemo(() =>
-    ACHIEVEMENT_DEFS.map(a => ({ ...a, earned: a.check(myThoughts, saved, appreciated) })),
-    [myThoughts, saved, appreciated]
+    ACHIEVEMENT_DEFS.map(a => ({ ...a, earned: a.check(myThoughts, saved, myThoughts.filter(t => t.appreciations > 0)) })),
+    [myThoughts, saved]
   );
 
   const activeFleeting = fleetingThoughts.filter(f => f.authorId === currentUser.id && new Date(f.expiresAt).getTime() > Date.now());
@@ -115,11 +138,10 @@ export default function ProfileScreen() {
 
   const openEditMenu = () => { tap(); setEditField("menu"); };
 
-  const applyImage = (kind: "avatar" | "banner", uri: string | null) => {
-    const res = kind === "avatar"
-      ? updateProfile({ avatarUri: uri })
-      : updateProfile({ bannerUri: uri });
-    if (res.ok) success();
+  const applyImage = async (kind: "avatar" | "banner", uri: string | null) => {
+    const updates = kind === "avatar" ? { avatar_url: uri } : { banner_url: uri };
+    const { error } = await updateAuthProfile(updates as any);
+    if (!error) success();
     setEditField(null);
   };
 
@@ -144,14 +166,15 @@ export default function ProfileScreen() {
     }
   };
 
-  const onSaveText = (field: "name" | "username" | "bio") => {
-    let res;
-    if (field === "name") res = updateProfile({ displayName: nameDraft });
-    else if (field === "username") res = updateProfile({ username: usernameDraft });
-    else res = updateProfile({ bio: bioDraft });
+  const onSaveText = async (field: "name" | "username" | "bio") => {
+    let updates: Partial<import("@/context/AuthContext").AuthProfile> = {};
+    if (field === "name") updates = { display_name: nameDraft };
+    else if (field === "username") updates = { username: usernameDraft };
+    else updates = { bio: bioDraft };
 
-    if (!res.ok) {
-      modal.alert({ title: "Couldn't update", message: res.message });
+    const { error } = await updateAuthProfile(updates);
+    if (error) {
+      modal.alert({ title: "Couldn't update", message: error.message });
       return;
     }
     success();
@@ -263,7 +286,7 @@ export default function ProfileScreen() {
               </View>
               <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
               <View style={styles.stat}>
-                <Text style={[styles.statNum, { color: colors.foreground }]}>{formatCount(appreciated.length)}</Text>
+                <Text style={[styles.statNum, { color: colors.foreground }]}>{formatCount(totalAppreciationsReceived)}</Text>
                 <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Appreciated</Text>
               </View>
               <View style={[styles.statDivider, { backgroundColor: colors.border }]} />

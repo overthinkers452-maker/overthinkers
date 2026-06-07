@@ -47,7 +47,9 @@ export default function ComposeScreen() {
   const [showModeSelector, setShowModeSelector] = useState(false);
 
   const remaining = CHAR_LIMIT - content.length;
-  const canPost = content.trim().length > 0 && content.length <= CHAR_LIMIT;
+  const validPollOptions = pollOptions.filter(o => o.trim()).length;
+  const canPost = content.trim().length > 0 && content.length <= CHAR_LIMIT
+    && (!showPoll || validPollOptions >= 2);
 
   const modeColor =
     mode === "Public" ? colors.publicMode

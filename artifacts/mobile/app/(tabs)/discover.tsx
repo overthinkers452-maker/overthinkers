@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, FlatList, Platform,
+  TextInput, FlatList, Platform, ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -10,6 +10,8 @@ import { useColors } from "@/hooks/useColors";
 import { useApp } from "@/context/AppContext";
 import { ThoughtCard } from "@/components/ThoughtCard";
 import { formatCount } from "@/utils/format";
+import * as svc from "@/lib/thoughtsService";
+import type { LeaderboardEntry } from "@/lib/thoughtsService";
 
 type DiscoverTab = "Explore" | "Leaderboard";
 const TRENDING_SEARCHES = ["consciousness", "AI relationships", "free will", "loneliness", "identity"];
@@ -18,25 +20,6 @@ const BADGE_COLORS: Record<string, string> = { Elder: "#FBBF24", Insightful: "#C
 const AVATAR_BG_POOL = ["#C8F5D8","#C8D8FF","#E8C8FF","#FFE8C8","#C8FFEE","#FFD8E8"];
 function avatarBg(index: number) { return AVATAR_BG_POOL[index % AVATAR_BG_POOL.length]; }
 
-function buildLeaderboard(thoughts: ReturnType<typeof useApp>["thoughts"]) {
-  const totals: Record<string, { name: string; username: string; appreciated: number; badge: string; authorId: string }> = {};
-  for (const t of thoughts) {
-    if (t.postingMode === "Anonymous") continue;
-    const key = t.authorId;
-    const display = t.postingMode === "Pseudonymous" ? (t.alias || t.authorName) : t.authorName;
-    if (!totals[key]) totals[key] = { name: display, username: t.authorUsername, appreciated: 0, badge: "Newcomer", authorId: t.authorId };
-    totals[key].appreciated += t.appreciations;
-  }
-  return Object.entries(totals)
-    .map(([_id, v]) => v)
-    .sort((a, b) => b.appreciated - a.appreciated)
-    .map((entry, i) => ({
-      ...entry,
-      rank: i + 1,
-      badge: entry.appreciated >= 2000 ? "Elder" : entry.appreciated >= 1000 ? "Insightful" : entry.appreciated >= 300 ? "Thoughtful" : "Newcomer",
-    }));
-}
-
 export default function DiscoverScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -44,15 +27,38 @@ export default function DiscoverScreen() {
   const { thoughts, followedUsers, toggleFollowUser } = useApp();
   const [activeTab, setActiveTab] = useState<DiscoverTab>("Explore");
   const [search, setSearch] = useState("");
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : 56 + insets.bottom;
 
-  const leaderboard = useMemo(() => buildLeaderboard(thoughts), [thoughts]);
-  const top3 = leaderboard.slice(0, 3);
-  const rest = leaderboard.slice(3);
+  const loadLeaderboard = useCallback(async () => {
+    setLeaderboardLoading(true);
+    try {
+      const data = await svc.fetchLeaderboard();
+      setLeaderboard(data.map((e, i) => ({ ...e, rank: i + 1 })) as any);
+    } catch {}
+    setLeaderboardLoading(false);
+  }, []);
 
-  const trendingThoughts = useMemo(() => [...thoughts].sort((a, b) => b.qualityScore - a.qualityScore).slice(0, 4), [thoughts]);
+  useEffect(() => {
+    if (activeTab === "Leaderboard" && leaderboard.length === 0) {
+      loadLeaderboard();
+    }
+  }, [activeTab]);
+
+  const leaderboardWithRanks = useMemo(() =>
+    leaderboard.map((e, i) => ({ ...e, rank: i + 1 })),
+    [leaderboard]
+  );
+  const top3 = leaderboardWithRanks.slice(0, 3);
+  const rest = leaderboardWithRanks.slice(3);
+
+  const trendingThoughts = useMemo(() =>
+    [...thoughts].sort((a, b) => b.qualityScore - a.qualityScore).slice(0, 4),
+    [thoughts]
+  );
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -63,7 +69,12 @@ export default function DiscoverScreen() {
   const searchResults = useMemo(() => {
     if (!search.trim()) return null;
     const q = search.toLowerCase();
-    return thoughts.filter(t => t.content.toLowerCase().includes(q) || t.category.toLowerCase().includes(q) || t.authorName.toLowerCase().includes(q) || (t.alias || "").toLowerCase().includes(q));
+    return thoughts.filter(t =>
+      t.content.toLowerCase().includes(q) ||
+      t.category.toLowerCase().includes(q) ||
+      t.authorName.toLowerCase().includes(q) ||
+      (t.alias || "").toLowerCase().includes(q)
+    );
   }, [thoughts, search]);
 
   const styles = makeStyles(colors);
@@ -129,68 +140,80 @@ export default function DiscoverScreen() {
             </ScrollView>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: bottomPad + 16 }}>
-              {top3.length > 0 && (
-                <View style={[styles.podium, { borderBottomColor: colors.border }]}>
-                  {/* 2nd place */}
-                  {top3[1] ? (
-                    <TouchableOpacity style={styles.podiumSide} activeOpacity={0.8} onPress={() => router.push({ pathname: "/profile/[userId]", params: { userId: top3[1].authorId, name: top3[1].name } })}>
-                      <View style={[styles.podiumAvatarSm, { backgroundColor: avatarBg(1) }]}><Text style={styles.podiumInitialsSm}>{top3[1].name.slice(0,2).toUpperCase()}</Text></View>
-                      <View style={[styles.rankBadgeSm, { backgroundColor: "#7A7A90" }]}><Text style={styles.rankBadgeText}>#2</Text></View>
-                      <Text style={styles.podiumName} numberOfLines={1}>{top3[1].name}</Text>
-                      <View style={[styles.podiumBadgeChip, { backgroundColor: (BADGE_COLORS[top3[1].badge]||"#818CF8")+"30" }]}><Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[1].badge]||"#818CF8" }]}>{top3[1].badge}</Text></View>
-                      <Text style={[styles.podiumCount, { color: colors.mutedForeground }]}>{formatCount(top3[1].appreciated)} appreciated</Text>
-                    </TouchableOpacity>
-                  ) : <View style={styles.podiumSide} />}
-
-                  {/* 1st place */}
-                  <TouchableOpacity style={styles.podiumCenter} activeOpacity={0.8} onPress={() => router.push({ pathname: "/profile/[userId]", params: { userId: top3[0].authorId, name: top3[0].name } })}>
-                    <Text style={[styles.podiumFirstLabel, { color: colors.foreground }]}>1st</Text>
-                    <View style={[styles.podiumAvatarLg, { backgroundColor: avatarBg(0) }]}><Text style={styles.podiumInitialsLg}>{top3[0].name.slice(0,2).toUpperCase()}</Text></View>
-                    <View style={[styles.rankBadgeLg, { backgroundColor: "#F59E0B" }]}><Text style={styles.rankBadgeText}>#1</Text></View>
-                    <Text style={[styles.podiumName, { fontFamily: "Inter_700Bold", fontSize: 14, color: colors.foreground }]}>{top3[0].name}</Text>
-                    <View style={[styles.podiumBadgeChip, { backgroundColor: (BADGE_COLORS[top3[0].badge]||"#FBBF24")+"30" }]}><Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[0].badge]||"#FBBF24" }]}>{top3[0].badge}</Text></View>
-                    <Text style={[styles.podiumCount, { color: colors.mutedForeground }]}>{formatCount(top3[0].appreciated)} appreciated</Text>
-                  </TouchableOpacity>
-
-                  {/* 3rd place */}
-                  {top3[2] ? (
-                    <TouchableOpacity style={styles.podiumSide} activeOpacity={0.8} onPress={() => router.push({ pathname: "/profile/[userId]", params: { userId: top3[2].authorId, name: top3[2].name } })}>
-                      <View style={[styles.podiumAvatarSm, { backgroundColor: avatarBg(2) }]}><Text style={styles.podiumInitialsSm}>{top3[2].name.slice(0,2).toUpperCase()}</Text></View>
-                      <View style={[styles.rankBadgeSm, { backgroundColor: "#9088CC" }]}><Text style={styles.rankBadgeText}>#3</Text></View>
-                      <Text style={styles.podiumName} numberOfLines={1}>{top3[2].name}</Text>
-                      <View style={[styles.podiumBadgeChip, { backgroundColor: (BADGE_COLORS[top3[2].badge]||"#C084FC")+"30" }]}><Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[2].badge]||"#C084FC" }]}>{top3[2].badge}</Text></View>
-                      <Text style={[styles.podiumCount, { color: colors.mutedForeground }]}>{formatCount(top3[2].appreciated)} appreciated</Text>
-                    </TouchableOpacity>
-                  ) : <View style={styles.podiumSide} />}
+              {leaderboardLoading ? (
+                <View style={styles.emptyState}>
+                  <ActivityIndicator color={colors.primary} />
+                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Loading leaderboard…</Text>
                 </View>
-              )}
+              ) : (
+                <>
+                  {top3.length > 0 && (
+                    <View style={[styles.podium, { borderBottomColor: colors.border }]}>
+                      {/* 2nd place */}
+                      {top3[1] ? (
+                        <TouchableOpacity style={styles.podiumSide} activeOpacity={0.8} onPress={() => router.push({ pathname: "/profile/[userId]", params: { userId: top3[1].authorId, name: top3[1].name } })}>
+                          <View style={[styles.podiumAvatarSm, { backgroundColor: avatarBg(1) }]}><Text style={styles.podiumInitialsSm}>{top3[1].name.slice(0,2).toUpperCase()}</Text></View>
+                          <View style={[styles.rankBadgeSm, { backgroundColor: "#7A7A90" }]}><Text style={styles.rankBadgeText}>#2</Text></View>
+                          <Text style={styles.podiumName} numberOfLines={1}>{top3[1].name}</Text>
+                          <View style={[styles.podiumBadgeChip, { backgroundColor: (BADGE_COLORS[top3[1].badge]||"#818CF8")+"30" }]}><Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[1].badge]||"#818CF8" }]}>{top3[1].badge}</Text></View>
+                          <Text style={[styles.podiumCount, { color: colors.mutedForeground }]}>{formatCount(top3[1].appreciated)} rep</Text>
+                        </TouchableOpacity>
+                      ) : <View style={styles.podiumSide} />}
 
-              {leaderboard.length === 0 && (
-                <View style={styles.emptyState}><Feather name="award" size={28} color={colors.mutedForeground} /><Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No public authors yet.</Text></View>
-              )}
+                      {/* 1st place */}
+                      <TouchableOpacity style={styles.podiumCenter} activeOpacity={0.8} onPress={() => router.push({ pathname: "/profile/[userId]", params: { userId: top3[0].authorId, name: top3[0].name } })}>
+                        <Text style={[styles.podiumFirstLabel, { color: colors.foreground }]}>1st</Text>
+                        <View style={[styles.podiumAvatarLg, { backgroundColor: avatarBg(0) }]}><Text style={styles.podiumInitialsLg}>{top3[0].name.slice(0,2).toUpperCase()}</Text></View>
+                        <View style={[styles.rankBadgeLg, { backgroundColor: "#F59E0B" }]}><Text style={styles.rankBadgeText}>#1</Text></View>
+                        <Text style={[styles.podiumName, { fontFamily: "Inter_700Bold", fontSize: 14, color: colors.foreground }]}>{top3[0].name}</Text>
+                        <View style={[styles.podiumBadgeChip, { backgroundColor: (BADGE_COLORS[top3[0].badge]||"#FBBF24")+"30" }]}><Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[0].badge]||"#FBBF24" }]}>{top3[0].badge}</Text></View>
+                        <Text style={[styles.podiumCount, { color: colors.mutedForeground }]}>{formatCount(top3[0].appreciated)} rep</Text>
+                      </TouchableOpacity>
 
-              {rest.map(user => {
-                const followed = followedUsers.has(user.authorId);
-                const badgeColor = BADGE_COLORS[user.badge] || "#818CF8";
-                return (
-                  <TouchableOpacity key={user.authorId} onPress={() => router.push({ pathname: "/profile/[userId]", params: { userId: user.authorId, name: user.name } })} style={[styles.rankRow, { borderBottomColor: colors.border }]} activeOpacity={0.8}>
-                    <Text style={[styles.rankNum, { color: colors.mutedForeground }]}>#{user.rank}</Text>
-                    <View style={[styles.rankAvatar, { backgroundColor: avatarBg(user.rank) }]}>
-                      <Text style={[styles.rankAvatarText, { color: "#2D2D50" }]}>{user.name.slice(0,2).toUpperCase()}</Text>
+                      {/* 3rd place */}
+                      {top3[2] ? (
+                        <TouchableOpacity style={styles.podiumSide} activeOpacity={0.8} onPress={() => router.push({ pathname: "/profile/[userId]", params: { userId: top3[2].authorId, name: top3[2].name } })}>
+                          <View style={[styles.podiumAvatarSm, { backgroundColor: avatarBg(2) }]}><Text style={styles.podiumInitialsSm}>{top3[2].name.slice(0,2).toUpperCase()}</Text></View>
+                          <View style={[styles.rankBadgeSm, { backgroundColor: "#9088CC" }]}><Text style={styles.rankBadgeText}>#3</Text></View>
+                          <Text style={styles.podiumName} numberOfLines={1}>{top3[2].name}</Text>
+                          <View style={[styles.podiumBadgeChip, { backgroundColor: (BADGE_COLORS[top3[2].badge]||"#C084FC")+"30" }]}><Text style={[styles.podiumBadgeText, { color: BADGE_COLORS[top3[2].badge]||"#C084FC" }]}>{top3[2].badge}</Text></View>
+                          <Text style={[styles.podiumCount, { color: colors.mutedForeground }]}>{formatCount(top3[2].appreciated)} rep</Text>
+                        </TouchableOpacity>
+                      ) : <View style={styles.podiumSide} />}
                     </View>
-                    <View style={styles.rankInfo}>
-                      <Text style={[styles.rankName, { color: colors.foreground }]} numberOfLines={1}>{user.name}</Text>
-                      <View style={styles.rankMeta}>
-                        <View style={[styles.rankBadgeChip, { backgroundColor: badgeColor+"25" }]}><Text style={[styles.rankBadgeLabel, { color: badgeColor }]}>{user.badge}</Text></View>
-                        <Text style={[styles.rankCount, { color: colors.mutedForeground }]}>{formatCount(user.appreciated)} appreciated</Text>
-                      </View>
+                  )}
+
+                  {leaderboard.length === 0 && (
+                    <View style={styles.emptyState}>
+                      <Feather name="award" size={28} color={colors.mutedForeground} />
+                      <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No public authors yet.</Text>
                     </View>
-                    <TouchableOpacity onPress={() => toggleFollowUser(user.authorId)} style={[styles.followBtn, { backgroundColor: followed ? "transparent" : colors.primary, borderColor: followed ? colors.border : colors.primary }]} activeOpacity={0.8}>
-                      <Text style={[styles.followText, { color: followed ? colors.foreground : "#fff" }]}>{followed ? "Following" : "Follow"}</Text>
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                );
-              })}
+                  )}
+
+                  {rest.map((entry: any) => {
+                    const followed = followedUsers.has(entry.authorId);
+                    const badgeColor = BADGE_COLORS[entry.badge] || "#818CF8";
+                    return (
+                      <TouchableOpacity key={entry.authorId} onPress={() => router.push({ pathname: "/profile/[userId]", params: { userId: entry.authorId, name: entry.name } })} style={[styles.rankRow, { borderBottomColor: colors.border }]} activeOpacity={0.8}>
+                        <Text style={[styles.rankNum, { color: colors.mutedForeground }]}>#{entry.rank}</Text>
+                        <View style={[styles.rankAvatar, { backgroundColor: avatarBg(entry.rank) }]}>
+                          <Text style={[styles.rankAvatarText, { color: "#2D2D50" }]}>{entry.name.slice(0,2).toUpperCase()}</Text>
+                        </View>
+                        <View style={styles.rankInfo}>
+                          <Text style={[styles.rankName, { color: colors.foreground }]} numberOfLines={1}>{entry.name}</Text>
+                          <View style={styles.rankMeta}>
+                            <View style={[styles.rankBadgeChip, { backgroundColor: badgeColor+"25" }]}><Text style={[styles.rankBadgeLabel, { color: badgeColor }]}>{entry.badge}</Text></View>
+                            <Text style={[styles.rankCount, { color: colors.mutedForeground }]}>{formatCount(entry.appreciated)} rep</Text>
+                          </View>
+                        </View>
+                        <TouchableOpacity onPress={() => toggleFollowUser(entry.authorId)} style={[styles.followBtn, { backgroundColor: followed ? "transparent" : colors.primary, borderColor: followed ? colors.border : colors.primary }]} activeOpacity={0.8}>
+                          <Text style={[styles.followText, { color: followed ? colors.foreground : "#fff" }]}>{followed ? "Following" : "Follow"}</Text>
+                        </TouchableOpacity>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </>
+              )}
             </ScrollView>
           )}
         </>
@@ -221,6 +244,8 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     categoryCardName: { fontSize: 14, fontFamily: "Inter_600SemiBold", marginBottom: 3 },
     categoryCardCount: { fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 10 },
     categoryCardLine: { height: 3, width: 28, borderRadius: 2, marginTop: 4 },
+    emptyState: { paddingTop: 60, alignItems: "center", gap: 10 },
+    emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: "#999" },
     podium: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 20, paddingTop: 24, paddingBottom: 16, borderBottomWidth: 1, gap: 8 },
     podiumCenter: { flex: 1, alignItems: "center" },
     podiumSide: { flex: 1, alignItems: "center", paddingTop: 20 },
@@ -246,9 +271,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     rankBadgeChip: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
     rankBadgeLabel: { fontSize: 11, fontFamily: "Inter_500Medium" },
     rankCount: { fontSize: 12, fontFamily: "Inter_400Regular" },
-    followBtn: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+    followBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 1 },
     followText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-    emptyState: { paddingTop: 60, alignItems: "center", gap: 8, paddingHorizontal: 40 },
-    emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
   });
 }

@@ -3,6 +3,7 @@ import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import * as Localization from "expo-localization";
+import { supabase } from "@/lib/supabase";
 
 export type AppLanguage = "en" | "el" | "es" | "fr" | "hi";
 
@@ -77,6 +78,7 @@ interface SettingsContextType {
   sessions: DeviceSession[];
   terminateOtherSessions: () => number;
   loginHistory: LoginEvent[];
+  recordLogin: (status: "success" | "failed") => void;
 
   loaded: boolean;
 }
@@ -125,45 +127,7 @@ function platformLabel(): string {
   return String(Platform.OS);
 }
 
-function seedSessions(): DeviceSession[] {
-  const now = Date.now();
-  return [
-    {
-      id: "current",
-      device: deviceName(),
-      platform: platformLabel(),
-      location: "This device",
-      lastActiveISO: new Date(now).toISOString(),
-      current: true,
-    },
-    {
-      id: "sess-" + (now - 1).toString(36),
-      device: "iPhone 15",
-      platform: "iOS 18.2",
-      location: "Mumbai, IN",
-      lastActiveISO: new Date(now - 1000 * 60 * 60 * 26).toISOString(),
-      current: false,
-    },
-    {
-      id: "sess-" + (now - 2).toString(36),
-      device: "Chrome",
-      platform: "Web · macOS",
-      location: "Bengaluru, IN",
-      lastActiveISO: new Date(now - 1000 * 60 * 60 * 24 * 4).toISOString(),
-      current: false,
-    },
-  ];
-}
 
-function seedLoginHistory(): LoginEvent[] {
-  const now = Date.now();
-  return [
-    { id: "lh1", device: deviceName(), platform: platformLabel(), timeISO: new Date(now).toISOString(), status: "success", location: "This device" },
-    { id: "lh2", device: "iPhone 15", platform: "iOS 18.2", timeISO: new Date(now - 1000 * 60 * 60 * 26).toISOString(), status: "success", location: "Mumbai, IN" },
-    { id: "lh3", device: "Unknown device", platform: "Web · Windows", timeISO: new Date(now - 1000 * 60 * 60 * 50).toISOString(), status: "failed", location: "Unknown" },
-    { id: "lh4", device: "Chrome", platform: "Web · macOS", timeISO: new Date(now - 1000 * 60 * 60 * 24 * 4).toISOString(), status: "success", location: "Bengaluru, IN" },
-  ];
-}
 
 const DEFAULT_NOTIF: NotificationPrefs = { appreciations: true, comments: true, follows: true, reposts: false };
 const DEFAULT_2FA: TwoFactorState = { enabled: false, secret: null, backupCodes: [] };
@@ -230,24 +194,52 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const passwordVal = map[KEYS.PASSWORD];
         if (passwordVal) setPasswordHash(passwordVal);
 
+        // Sessions: only track the real current device — no mock sessions
         let sess: DeviceSession[] = [];
         const sessionsVal = map[KEYS.SESSIONS];
         if (sessionsVal) {
           try { sess = JSON.parse(sessionsVal); } catch {}
         }
-        if (!Array.isArray(sess) || sess.length === 0) {
-          sess = seedSessions();
+        // Keep only the current-device session; filter out any old mock entries
+        const realSess = sess.filter((s: DeviceSession) => s.current);
+        if (realSess.length === 0) {
+          const currentSess: DeviceSession = {
+            id: "current",
+            device: deviceName(),
+            platform: platformLabel(),
+            location: "This device",
+            lastActiveISO: new Date().toISOString(),
+            current: true,
+          };
+          sess = [currentSess];
           AsyncStorage.setItem(KEYS.SESSIONS, JSON.stringify(sess)).catch(() => {});
+        } else {
+          sess = realSess;
         }
         setSessions(sess);
 
+        // Login history: start from current login only, no mock history
         let hist: LoginEvent[] = [];
         const historyVal = map[KEYS.LOGIN_HISTORY];
         if (historyVal) {
           try { hist = JSON.parse(historyVal); } catch {}
         }
-        if (!Array.isArray(hist) || hist.length === 0) {
-          hist = seedLoginHistory();
+        // Filter out any mock entries (those with hardcoded device names)
+        const realHist = hist.filter((h: LoginEvent) => h.id !== "lh1" && h.id !== "lh2" && h.id !== "lh3" && h.id !== "lh4");
+        if (realHist.length === 0 && hist.length === 0) {
+          // First ever load — record this login
+          const firstLogin: LoginEvent = {
+            id: Date.now().toString(),
+            device: deviceName(),
+            platform: platformLabel(),
+            timeISO: new Date().toISOString(),
+            status: "success",
+            location: "This device",
+          };
+          hist = [firstLogin];
+          AsyncStorage.setItem(KEYS.LOGIN_HISTORY, JSON.stringify(hist)).catch(() => {});
+        } else if (realHist.length > 0) {
+          hist = realHist;
           AsyncStorage.setItem(KEYS.LOGIN_HISTORY, JSON.stringify(hist)).catch(() => {});
         }
         setLoginHistory(hist);
@@ -282,6 +274,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setPrivateAccount = useCallback((v: boolean) => {
     setPrivateState(v);
     AsyncStorage.setItem(KEYS.PRIVATE, v ? "1" : "0").catch(() => {});
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        supabase.from("profiles").update({ is_private: v }).eq("id", data.user.id).then(undefined, () => {});
+      }
+    }).catch(() => {});
   }, []);
 
   const setHideDisagreements = useCallback((v: boolean) => {
@@ -341,6 +338,22 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     return removed;
   }, []);
 
+  const recordLogin = useCallback((status: "success" | "failed") => {
+    const entry: LoginEvent = {
+      id: Date.now().toString(),
+      device: deviceName(),
+      platform: platformLabel(),
+      timeISO: new Date().toISOString(),
+      status,
+      location: "This device",
+    };
+    setLoginHistory((prev) => {
+      const next = [entry, ...prev].slice(0, 50);
+      AsyncStorage.setItem(KEYS.LOGIN_HISTORY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
   const value = useMemo<SettingsContextType>(() => ({
     hapticsEnabled, setHapticsEnabled,
     soundEnabled, setSoundEnabled,
@@ -353,13 +366,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     hasPassword: passwordHash != null,
     verifyPassword, setPassword,
     sessions, terminateOtherSessions,
-    loginHistory,
+    loginHistory, recordLogin,
     loaded,
   }), [
     hapticsEnabled, setHapticsEnabled, soundEnabled, setSoundEnabled, appLanguage, setAppLanguage,
     notifications, setNotification, privateAccount, setPrivateAccount, hideDisagreements, setHideDisagreements,
     blockedWords, addBlockedWord, removeBlockedWord, twoFactor, enableTwoFactor, disableTwoFactor,
-    passwordHash, verifyPassword, setPassword, sessions, terminateOtherSessions, loginHistory, loaded,
+    passwordHash, verifyPassword, setPassword, sessions, terminateOtherSessions, loginHistory, recordLogin, loaded,
   ]);
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
