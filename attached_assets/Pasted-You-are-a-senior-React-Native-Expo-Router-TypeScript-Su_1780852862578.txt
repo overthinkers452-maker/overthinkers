@@ -1,0 +1,309 @@
+You are a senior React Native, Expo Router, TypeScript, Supabase, PostgreSQL, and mobile product engineer.
+
+Project: Overthinkers
+
+Your mission is to transform this codebase into a production-ready social platform.
+
+IMPORTANT RULES
+
+1. Analyze the entire codebase before changing anything.
+2. Do not remove existing features.
+3. Preserve existing UI design and branding.
+4. Keep Expo compatibility.
+5. Use TypeScript everywhere.
+6. Use Supabase as the backend.
+7. Create production-quality architecture.
+8. Fix broken functionality while implementing missing features.
+9. Work feature-by-feature and commit-safe.
+10. Generate a CHANGELOG for every major modification.
+
+==================================================
+PHASE 1 — COMPLETE AUDIT
+==================================================
+
+Create:
+
+/docs/AUDIT_REPORT.md
+
+Include:
+
+- Working features
+- Partially working features
+- Broken features
+- UI issues
+- Navigation issues
+- State management issues
+- Security issues
+- Performance issues
+- Missing production features
+- Database requirements
+- Supabase requirements
+
+Do not skip anything.
+
+==================================================
+PHASE 2 — SUPABASE INTEGRATION
+==================================================
+
+Create production backend architecture.
+
+Implement:
+
+- Authentication
+- User profiles
+- Sessions
+- Secure storage
+- Row level security
+- User onboarding
+
+Create tables:
+
+users
+profiles
+thoughts
+comments
+likes
+bookmarks
+follows
+notifications
+reports
+
+Create SQL schema.
+
+Create indexes.
+
+Create RLS policies.
+
+==================================================
+PHASE 3 — AUTHENTICATION
+==================================================
+
+Implement:
+
+- Sign up
+- Login
+- Logout
+- Email verification
+- Forgot password
+- Reset password
+- Session persistence
+
+Create:
+
+AuthContext
+Protected routes
+Guest routes
+
+==================================================
+PHASE 4 — REAL THOUGHT SYSTEM
+==================================================
+
+Replace mock data.
+
+Implement:
+
+Create Thought
+Edit Thought
+Delete Thought
+
+Fields:
+
+id
+author
+content
+category
+privacy
+created_at
+updated_at
+
+Support:
+
+Public thoughts
+Anonymous thoughts
+
+==================================================
+PHASE 5 — REAL COMMENTS
+==================================================
+
+Implement:
+
+- Add comment
+- Edit comment
+- Delete comment
+- Nested replies
+- Comment count
+
+Realtime updates.
+
+==================================================
+PHASE 6 — LIKES
+==================================================
+
+Implement:
+
+- Like
+- Unlike
+- Realtime count
+
+Persist in database.
+
+==================================================
+PHASE 7 — FOLLOW SYSTEM
+==================================================
+
+Implement:
+
+- Follow
+- Unfollow
+- Followers count
+- Following count
+
+Profile relationships.
+
+==================================================
+PHASE 8 — SEARCH
+==================================================
+
+Implement:
+
+Search:
+
+- Users
+- Thoughts
+- Categories
+
+Create proper indexing.
+
+==================================================
+PHASE 9 — NOTIFICATIONS
+==================================================
+
+Implement notification system.
+
+Events:
+
+- Like
+- Comment
+- Reply
+- Follow
+
+Notification center.
+
+Unread badge.
+
+==================================================
+PHASE 10 — PROFILE IMPROVEMENTS
+==================================================
+
+Implement:
+
+- Edit profile
+- Avatar upload
+- Bio
+- Username
+- Website
+
+Storage integration.
+
+==================================================
+PHASE 11 — BOOKMARKS
+==================================================
+
+Implement:
+
+- Save thought
+- Remove bookmark
+- Bookmarks screen
+
+==================================================
+PHASE 12 — SHARE
+==================================================
+
+Implement native share.
+
+Use Expo Sharing API.
+
+==================================================
+PHASE 13 — MODERATION
+==================================================
+
+Implement:
+
+- Report thought
+- Report comment
+- Block user
+- Mute user
+
+Create moderation database tables.
+
+==================================================
+PHASE 14 — PERFORMANCE
+==================================================
+
+Optimize:
+
+- FlatLists
+- Memoization
+- React Query
+- Pagination
+- Infinite scroll
+
+==================================================
+PHASE 15 — KEYBOARD FIXES
+==================================================
+
+Fix every screen where keyboard overlaps inputs.
+
+Use:
+
+KeyboardAvoidingView
+ScrollView
+SafeAreaView
+
+Ensure all text inputs remain visible.
+
+==================================================
+PHASE 16 — BUG FIXING
+==================================================
+
+Find and fix:
+
+- Broken buttons
+- Dead navigation
+- Empty screens
+- Mock functionality
+- State bugs
+
+==================================================
+PHASE 17 — FINAL REPORT
+==================================================
+
+Generate:
+
+/docs/FEATURE_STATUS.md
+
+Sections:
+
+WORKING FEATURES
+
+PARTIAL FEATURES
+
+NEW FEATURES IMPLEMENTED
+
+REMAINING FEATURES
+
+BUGS FIXED
+
+DATABASE STRUCTURE
+
+SUPABASE SETUP GUIDE
+
+==================================================
+IMPORTANT
+==================================================
+
+Do not implement video posting yet.
+
+Do not implement live streaming.
+
+Focus on creating a stable production-ready social platform with real backend functionality.
