@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { Thought, Comment, Poll } from "@/context/AppContext";
 import { calculateQualityScore } from "@/utils/format";
+import * as push from "@/lib/pushNotifications";
 
 // Wrap any Supabase thenable so native .catch() works
 async function rpc(name: string, params?: Record<string, unknown>) {
@@ -227,14 +228,20 @@ export async function deleteThought(thoughtId: string, authorId: string) {
 
 // ─── Toggle Appreciation ──────────────────────────────────────────────────────
 
-export async function toggleAppreciation(thoughtId: string, userId: string, currentlyAppreciated: boolean, thoughtAuthorId?: string) {
+export async function toggleAppreciation(
+  thoughtId: string,
+  userId: string,
+  currentlyAppreciated: boolean,
+  thoughtAuthorId?: string,
+  senderDisplayName?: string,
+  thoughtContent?: string,
+) {
   if (currentlyAppreciated) {
     await supabase.from("appreciations").delete().eq("thought_id", thoughtId).eq("user_id", userId);
     await rpc("decrement_thought_appreciations", { thought_id: thoughtId }).catch(() => {});
   } else {
     await supabase.from("appreciations").insert({ thought_id: thoughtId, user_id: userId });
     await rpc("increment_thought_appreciations", { thought_id: thoughtId }).catch(() => {});
-    // Notify the thought author (if not self-appreciation)
     if (thoughtAuthorId && thoughtAuthorId !== userId) {
       supabase.from("notifications").insert({
         user_id: thoughtAuthorId,
@@ -242,6 +249,12 @@ export async function toggleAppreciation(thoughtId: string, userId: string, curr
         actor_id: userId,
         thought_id: thoughtId,
       }).then(undefined, () => {});
+      push.sendAppreciationNotification({
+        recipientId: thoughtAuthorId,
+        senderName: senderDisplayName ?? "Someone",
+        thoughtContent: thoughtContent ?? "",
+        thoughtId,
+      }).catch(() => {});
     }
   }
 }
@@ -293,6 +306,14 @@ export async function toggleRepost(thought: Thought, userId: string, userDisplay
       feed_reason: `Reshared from ${thought.postingMode === "Anonymous" ? "Anonymous" : (thought.alias || thought.authorName)}`,
     });
     await rpc("increment_thought_reposts", { thought_id: thought.id }).catch(() => {});
+    if (thought.authorId !== userId && thought.postingMode !== "Anonymous") {
+      push.sendRepostNotification({
+        recipientId: thought.authorId,
+        senderName: userDisplayName,
+        thoughtContent: thought.content,
+        thoughtId: thought.id,
+      }).catch(() => {});
+    }
   }
 }
 
@@ -369,6 +390,8 @@ export async function createComment(params: {
   parentId?: string;
   depth?: number;
   thoughtAuthorId?: string;
+  senderDisplayName?: string;
+  thoughtContent?: string;
 }) {
   const { data, error } = await supabase.from("comments").insert({
     thought_id: params.thoughtId,
@@ -388,10 +411,26 @@ export async function createComment(params: {
   if (params.thoughtAuthorId && params.thoughtAuthorId !== params.authorId) {
     supabase.from("notifications").insert({
       user_id: params.thoughtAuthorId,
-      type: "comment",
+      type: params.parentId ? "reply" : "comment",
       actor_id: params.authorId,
       thought_id: params.thoughtId,
     }).then(undefined, () => {});
+
+    const displayName = params.postingMode === "Anonymous"
+      ? "Someone"
+      : params.postingMode === "Pseudonymous"
+      ? (params.alias || params.senderDisplayName || "Someone")
+      : (params.senderDisplayName ?? "Someone");
+
+    const sender = params.parentId
+      ? push.sendReplyNotification
+      : push.sendCommentNotification;
+    sender({
+      recipientId: params.thoughtAuthorId,
+      senderName: displayName,
+      [params.parentId ? "replyContent" : "commentContent"]: params.content,
+      thoughtId: params.thoughtId,
+    } as any).catch(() => {});
   }
 
   return mapDbComment(data);
@@ -436,13 +475,23 @@ export async function fetchFollowingIds(userId: string): Promise<string[]> {
   return (data ?? []).map((r: any) => r.following_id);
 }
 
-export async function toggleFollow(followerId: string, followingId: string, isFollowing: boolean) {
+export async function toggleFollow(
+  followerId: string,
+  followingId: string,
+  isFollowing: boolean,
+  senderDisplayName?: string,
+) {
   if (isFollowing) {
     await supabase.from("follows").delete().eq("follower_id", followerId).eq("following_id", followingId);
     await rpc("decrement_follow_counts", { follower_id: followerId, following_id: followingId }).catch(() => {});
   } else {
     await supabase.from("follows").insert({ follower_id: followerId, following_id: followingId });
     await rpc("increment_follow_counts", { follower_id: followerId, following_id: followingId }).catch(() => {});
+    push.sendFollowNotification({
+      recipientId: followingId,
+      senderName: senderDisplayName ?? "Someone",
+      senderId: followerId,
+    }).catch(() => {});
     supabase.from("notifications").insert({
       user_id: followingId,
       type: "follow",

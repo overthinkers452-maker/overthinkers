@@ -25,7 +25,7 @@
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#09090E"
       },
-      "permissions": []
+      "permissions": ["VIBRATE", "RECEIVE_BOOT_COMPLETED"]
     },
     "web": {
       "favicon": "./assets/images/icon.png",
@@ -48,7 +48,17 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#5B5BD6",
+          "defaultChannel": "default",
+          "androidMode": "default",
+          "androidCollapsedTitle": "Overthinkers"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

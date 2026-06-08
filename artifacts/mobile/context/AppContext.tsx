@@ -384,7 +384,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
     setFollowingIds(prev => isFollowing ? prev.filter(id => id !== userId) : [...prev, userId]);
     if (user) {
-      svc.toggleFollow(user.id, userId, isFollowing).catch(() => {});
+      svc.toggleFollow(user.id, userId, isFollowing, currentUser.displayName).catch(() => {});
     }
   }, [user, followedUsers]);
 
@@ -534,7 +534,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       return next;
     });
-    if (user) svc.toggleAppreciation(thoughtId, user.id, wasOn, authorId).catch(() => {});
+    if (user) svc.toggleAppreciation(thoughtId, user.id, wasOn, authorId, currentUser.displayName, thoughts.find(t => t.id === thoughtId)?.content).catch(() => {});
   }, [user]);
 
   const toggleDisagree = useCallback((thoughtId: string) => {
@@ -640,6 +640,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       parentId: comment.parentId,
       depth: comment.depth,
       thoughtAuthorId,
+      senderDisplayName: currentUser.displayName,
     }).then(created => {
       setComments(prev => ({
         ...prev,

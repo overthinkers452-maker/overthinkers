@@ -4,10 +4,11 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import * as Notifications from "expo-notifications";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -16,10 +17,54 @@ import { ModalProvider } from "@/context/ModalContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { AppProvider } from "@/context/AppContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { registerForPushNotifications } from "@/lib/pushNotifications";
 
 SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
+// ─── Push notification tap → navigation ──────────────────────────────────────
+function PushNotificationManager() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const notifListenerRef = useRef<Notifications.EventSubscription | null>(null);
+  const responseListenerRef = useRef<Notifications.EventSubscription | null>(null);
+
+  // Register token whenever user changes
+  useEffect(() => {
+    if (!user) return;
+    registerForPushNotifications(user.id).catch(() => {});
+  }, [user?.id]);
+
+  // Set up tap listener once (no dependency re-runs needed)
+  useEffect(() => {
+    if (typeof window !== "undefined" && !("ExpoNotifications" in globalThis)) {
+      return; // web SSR — skip
+    }
+
+    notifListenerRef.current = Notifications.addNotificationReceivedListener(() => {
+      // Foreground display is handled by setNotificationHandler at top of lib file
+    });
+
+    responseListenerRef.current = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data as Record<string, unknown> | null;
+      if (!data) return;
+      if (typeof data.thoughtId === "string") {
+        router.push({ pathname: "/thought/[id]", params: { id: data.thoughtId } });
+      } else if (typeof data.actorId === "string") {
+        router.push({ pathname: "/profile/[userId]", params: { userId: data.actorId } });
+      }
+    });
+
+    return () => {
+      notifListenerRef.current?.remove();
+      responseListenerRef.current?.remove();
+    };
+  }, []);
+
+  return null;
+}
+
+// ─── Auth-gated routing ───────────────────────────────────────────────────────
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
   const segments = useSegments();
@@ -76,6 +121,7 @@ export default function RootLayout() {
                       <ToastProvider>
                         <ModalProvider>
                           <AuthGate>
+                            <PushNotificationManager />
                             <RootLayoutNav />
                           </AuthGate>
                         </ModalProvider>

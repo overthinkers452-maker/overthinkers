@@ -20,6 +20,7 @@ create table if not exists public.profiles (
   following_count integer default 0,
   thoughts_count integer default 0,
   username_changed_at timestamptz,
+  push_token text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
