@@ -34,6 +34,23 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Retry fetching the profile a few times — the DB trigger may be slightly
+// delayed right after a new user signs up.
+async function fetchProfileWithRetry(userId: string, attempts = 4): Promise<AuthProfile | null> {
+  for (let i = 0; i < attempts; i++) {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+    if (!error && data) return data as AuthProfile;
+    if (i < attempts - 1) {
+      await new Promise(res => setTimeout(res, 600 * (i + 1)));
+    }
+  }
+  return null;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -41,12 +58,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async (userId: string) => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
-    if (!error && data) setProfile(data as AuthProfile);
+    const data = await fetchProfileWithRetry(userId);
+    if (data) setProfile(data);
   }, []);
 
   useEffect(() => {
@@ -75,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!/^[a-z0-9_]{3,20}$/.test(trimmed)) {
       return { error: new Error("Username must be 3–20 characters: letters, numbers, or underscores.") };
     }
+
     const { data: existing } = await supabase
       .from("profiles")
       .select("id")
@@ -82,13 +96,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .maybeSingle();
     if (existing) return { error: new Error("That username is already taken.") };
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { username: trimmed, display_name: trimmed },
       },
     });
+
+    if (!error && data.user) {
+      // Upsert profile as a fallback in case the DB trigger hasn't been set up
+      // or hasn't fired yet. The trigger (if present) uses ON CONFLICT DO NOTHING,
+      // so running both is safe.
+      await supabase.from("profiles").upsert({
+        id: data.user.id,
+        username: trimmed,
+        display_name: trimmed,
+        bio: "",
+        reputation: 0,
+        badge: "Newcomer",
+        followers_count: 0,
+        following_count: 0,
+        thoughts_count: 0,
+      }, { onConflict: "id", ignoreDuplicates: false }).then(undefined, () => {});
+    }
+
     return { error };
   }, []);
 
@@ -150,7 +182,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const deleteAccount = useCallback(async () => {
     if (!user) return { error: new Error("Not authenticated") };
-    // Delete all user data from Supabase tables
     try {
       await Promise.all([
         supabase.from("thoughts").delete().eq("author_id", user.id),
@@ -162,9 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         supabase.from("notifications").delete().eq("user_id", user.id),
       ]);
     } catch {}
-    // Delete profile row
     try { await supabase.from("profiles").delete().eq("id", user.id); } catch {}
-    // Sign out (auth user deletion requires service key; best we can do from client is sign out)
     await supabase.auth.signOut();
     setProfile(null);
     return { error: null };
