@@ -55,3 +55,4 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOi
 
 [nix]
 channel = "stable-25_05"
+packages = ["inshellisense"]
