@@ -124,7 +124,7 @@ export default function DiscoverScreen() {
                 <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Categories</Text>
                 <View style={styles.categoriesGrid}>
                   {CATEGORIES_GRID.map(cat => (
-                    <TouchableOpacity key={cat} style={[styles.categoryCard, { borderColor: colors.border, backgroundColor: colors.card }]} activeOpacity={0.8} onPress={() => setSearch(cat)}>
+                    <TouchableOpacity key={cat} style={[styles.categoryCard, { borderColor: colors.border, backgroundColor: colors.card }]} activeOpacity={0.8} onPress={() => router.push({ pathname: "/category/[cat]", params: { cat } })}>
                       <Text style={[styles.categoryCardName, { color: colors.foreground }]}>{cat}</Text>
                       <Text style={[styles.categoryCardCount, { color: colors.mutedForeground }]}>{categoryCounts[cat] || 0} thoughts</Text>
                       <View style={[styles.categoryCardLine, { backgroundColor: colors.primary }]} />
