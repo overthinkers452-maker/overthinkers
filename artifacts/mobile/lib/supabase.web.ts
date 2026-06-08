@@ -47,6 +47,11 @@ export type Database = {
           following_count: number;
           thoughts_count: number;
           username_changed_at: string | null;
+          is_private: boolean;
+          hide_appreciations: boolean;
+          hide_reposts: boolean;
+          is_admin: boolean;
+          strike_count: number;
           created_at: string;
           updated_at: string;
         };
@@ -130,7 +135,7 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
-          type: "appreciation" | "comment" | "repost" | "follow" | "badge" | "reply";
+          type: "appreciation" | "comment" | "repost" | "follow" | "badge" | "reply" | "mention" | "system";
           actor_id: string | null;
           thought_id: string | null;
           comment_id: string | null;
@@ -166,6 +171,56 @@ export type Database = {
       comment_appreciations: {
         Row: { id: string; user_id: string; comment_id: string; created_at: string };
         Insert: Omit<Database["public"]["Tables"]["comment_appreciations"]["Row"], "id" | "created_at">;
+        Update: never;
+      };
+      mutes: {
+        Row: { id: string; muter_id: string; muted_id: string; created_at: string };
+        Insert: Omit<Database["public"]["Tables"]["mutes"]["Row"], "id" | "created_at">;
+        Update: never;
+      };
+      security_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          event_type: "login_success" | "login_fail" | "password_change" | "signout" | "signup";
+          metadata: Record<string, unknown> | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["security_logs"]["Row"], "id" | "created_at">;
+        Update: never;
+      };
+      hashtags: {
+        Row: { id: string; tag: string; usage_count: number; created_at: string };
+        Insert: Omit<Database["public"]["Tables"]["hashtags"]["Row"], "id" | "created_at" | "usage_count">;
+        Update: Partial<Database["public"]["Tables"]["hashtags"]["Row"]>;
+      };
+      thought_hashtags: {
+        Row: { id: string; thought_id: string; hashtag_id: string; created_at: string };
+        Insert: Omit<Database["public"]["Tables"]["thought_hashtags"]["Row"], "id" | "created_at">;
+        Update: never;
+      };
+      moderation_actions: {
+        Row: {
+          id: string;
+          moderator_id: string | null;
+          target_type: "thought" | "comment" | "user";
+          target_id: string;
+          action: "dismiss" | "remove" | "warn" | "ban";
+          note: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["moderation_actions"]["Row"], "id" | "created_at">;
+        Update: never;
+      };
+      user_strikes: {
+        Row: {
+          id: string;
+          user_id: string;
+          reason: string;
+          issued_by: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["user_strikes"]["Row"], "id" | "created_at">;
         Update: never;
       };
     };

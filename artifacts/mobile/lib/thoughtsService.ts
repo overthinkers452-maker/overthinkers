@@ -313,6 +313,12 @@ export async function toggleRepost(thought: Thought, userId: string, userDisplay
         thoughtContent: thought.content,
         thoughtId: thought.id,
       }).catch(() => {});
+      supabase.from("notifications").insert({
+        user_id: thought.authorId,
+        type: "repost",
+        actor_id: userId,
+        thought_id: thought.id,
+      }).then(undefined, () => {});
     }
   }
 }
@@ -645,5 +651,118 @@ export async function fetchNightThoughts(userId?: string): Promise<Thought[]> {
   if (!data) return [];
   const ids = data.map((r: any) => r.id);
   const interactions = userId ? await fetchUserInteractions(userId, ids) : undefined;
+  return data.map((row: any) => mapDbThought(row, userId, interactions));
+}
+
+// ─── Mutes ────────────────────────────────────────────────────────────────────
+
+export async function fetchMutedIds(userId: string): Promise<string[]> {
+  const { data } = await supabase
+    .from("mutes")
+    .select("muted_id")
+    .eq("muter_id", userId);
+  return (data ?? []).map((r: any) => r.muted_id);
+}
+
+export async function muteUser(muterId: string, mutedId: string): Promise<void> {
+  await supabase.from("mutes").insert({ muter_id: muterId, muted_id: mutedId });
+}
+
+export async function unmuteUser(muterId: string, mutedId: string): Promise<void> {
+  await supabase.from("mutes").delete().eq("muter_id", muterId).eq("muted_id", mutedId);
+}
+
+// ─── Security Logging ─────────────────────────────────────────────────────────
+
+export type SecurityEventType = "login_success" | "login_fail" | "password_change" | "signout" | "signup";
+
+export async function logSecurityEvent(
+  userId: string,
+  eventType: SecurityEventType,
+  metadata?: Record<string, unknown>,
+): Promise<void> {
+  await supabase.from("security_logs").insert({
+    user_id: userId,
+    event_type: eventType,
+    metadata: metadata ?? null,
+  });
+}
+
+// ─── Hashtags ─────────────────────────────────────────────────────────────────
+
+const HASHTAG_RE = /#([a-zA-Z0-9_]+)/g;
+
+export function extractHashtags(content: string): string[] {
+  const tags: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = HASHTAG_RE.exec(content)) !== null) {
+    tags.push(match[1].toLowerCase());
+  }
+  HASHTAG_RE.lastIndex = 0;
+  return [...new Set(tags)];
+}
+
+export async function indexThoughtHashtags(thoughtId: string, content: string): Promise<void> {
+  const tags = extractHashtags(content);
+  if (tags.length === 0) return;
+
+  for (const tag of tags) {
+    const hashtagId = await rpc("upsert_hashtag_and_increment", { p_tag: tag }).then(
+      (res: any) => res.data as string,
+      () => null,
+    );
+    if (!hashtagId) continue;
+    await supabase
+      .from("thought_hashtags")
+      .insert({ thought_id: thoughtId, hashtag_id: hashtagId })
+      .then(undefined, () => {});
+  }
+}
+
+export async function searchHashtags(query: string): Promise<{ id: string; tag: string; usage_count: number }[]> {
+  const { data } = await supabase
+    .from("hashtags")
+    .select("id, tag, usage_count")
+    .ilike("tag", `${query.replace(/^#/, "").toLowerCase()}%`)
+    .order("usage_count", { ascending: false })
+    .limit(20);
+  return data ?? [];
+}
+
+export async function fetchHashtagFeed(
+  tag: string,
+  userId: string | undefined,
+  limit = 20,
+  offset = 0,
+): Promise<Thought[]> {
+  const normalizedTag = tag.replace(/^#/, "").toLowerCase();
+
+  const { data: hashtagRow } = await supabase
+    .from("hashtags")
+    .select("id")
+    .eq("tag", normalizedTag)
+    .single();
+
+  if (!hashtagRow) return [];
+
+  const { data: joins } = await supabase
+    .from("thought_hashtags")
+    .select("thought_id")
+    .eq("hashtag_id", hashtagRow.id)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (!joins || joins.length === 0) return [];
+
+  const thoughtIds = joins.map((r: any) => r.thought_id as string);
+
+  const { data } = await supabase
+    .from("thoughts")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username)")
+    .in("id", thoughtIds)
+    .order("created_at", { ascending: false });
+
+  if (!data) return [];
+  const interactions = userId ? await fetchUserInteractions(userId, thoughtIds) : undefined;
   return data.map((row: any) => mapDbThought(row, userId, interactions));
 }
