@@ -1,3 +1,4 @@
 - [Metro phantom SyntaxError](metro-stale-cache.md) — Metro Babel parse error that tsc + standalone babel-parser can't reproduce = stale transform cache; clear metro cache + restart.
 - [AppContext state-updater purity](overthinkers-state-updaters.md) — overthinkers uses React Compiler; never nest setState in another updater. Past-due scheduled thought crashed returning users.
 - [Metro + pnpm transitive deps](metro-transitive-deps.md) — "Unable to resolve module X" at bundle time = a lib's undeclared transitive dep; `pnpm --filter add X` + restart expo. tsc won't catch it.
+- [Supabase SSR WebSocket crash](supabase-ssr-websocket.md) — Supabase createClient() throws at module init in Node.js 20 (no native WS); install `ws` and call getWsTransport() in realtime.transport option; browser/RN skip it via typeof WebSocket check.

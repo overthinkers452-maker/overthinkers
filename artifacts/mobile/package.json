@@ -62,6 +62,7 @@
     "expo-file-system": "~19.0.23",
     "expo-localization": "~17.0.9",
     "expo-sharing": "~14.0.8",
-    "react-native-qrcode-svg": "^6.3.21"
+    "react-native-qrcode-svg": "^6.3.21",
+    "ws": "^8.21.0"
   }
 }

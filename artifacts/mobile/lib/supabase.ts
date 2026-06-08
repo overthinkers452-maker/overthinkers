@@ -5,12 +5,30 @@ import { Platform } from "react-native";
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "https://placeholder.supabase.co";
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "placeholder-anon-key";
 
+// Node.js 20 has no native WebSocket. When running in SSR (Expo web server-side
+// render) we supply the `ws` package as the realtime transport so that
+// createClient() does not throw and crash the SSR page with a 500.
+// In browsers and React Native, `WebSocket` is always defined natively, so we
+// leave the transport undefined and let Supabase use its default.
+function getWsTransport() {
+  if (typeof WebSocket !== "undefined") return undefined;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require("ws");
+  } catch {
+    return undefined;
+  }
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: Platform.OS === "web" ? undefined : AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+  },
+  realtime: {
+    transport: getWsTransport(),
   },
 });
 
