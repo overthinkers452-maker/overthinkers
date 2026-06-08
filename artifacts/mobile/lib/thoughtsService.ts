@@ -601,7 +601,9 @@ export async function fetchProfileById(userId: string, viewerUserId?: string) {
 
   if (!data) return null;
 
-  if (data.is_private && viewerUserId && viewerUserId !== userId) {
+  if (data.is_private && viewerUserId !== userId) {
+    // No viewer ID (unauthenticated/unresolved) → treat as non-follower
+    if (!viewerUserId) return { ...data, _isPrivateAndHidden: true };
     const { data: follow } = await supabase
       .from("follows")
       .select("id")
@@ -615,13 +617,16 @@ export async function fetchProfileById(userId: string, viewerUserId?: string) {
 }
 
 export async function fetchProfileThoughts(userId: string, viewerUserId?: string): Promise<Thought[]> {
-  if (viewerUserId && viewerUserId !== userId) {
+  // Treat missing viewer as non-follower — private accounts return empty for unauthenticated viewers
+  const isOwnProfile = viewerUserId && viewerUserId === userId;
+  if (!isOwnProfile) {
     const { data: prof } = await supabase
       .from("profiles")
       .select("is_private")
       .eq("id", userId)
       .single();
     if (prof?.is_private) {
+      if (!viewerUserId) return [];
       const { data: follow } = await supabase
         .from("follows")
         .select("id")
@@ -677,14 +682,19 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
 
 // ─── Night thoughts ───────────────────────────────────────────────────────────
 
-export async function fetchNightThoughts(userId?: string): Promise<Thought[]> {
-  const { data } = await supabase
+export async function fetchNightThoughts(userId?: string, excludeIds: string[] = []): Promise<Thought[]> {
+  let query = supabase
     .from("thoughts")
     .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
     .eq("is_night_thought", true)
     .order("created_at", { ascending: false })
     .limit(50);
 
+  if (excludeIds.length > 0) {
+    query = query.not("author_id", "in", `(${excludeIds.join(",")})`);
+  }
+
+  const { data } = await query;
   if (!data) return [];
   const ids = data.map((r: any) => r.id);
   const interactions = userId ? await fetchUserInteractions(userId, ids) : undefined;

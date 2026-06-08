@@ -301,7 +301,7 @@ const nc = StyleSheet.create({
 
 export default function LateNightScreen() {
   const insets = useSafeAreaInsets();
-  const { thoughts, currentUser, toggleAppreciate, isBlocked, isMuted, postNightThought } = useApp();
+  const { thoughts, currentUser, toggleAppreciate, isBlocked, isMuted, blockedUsers, mutedUsers, postNightThought } = useApp();
   const { user } = useAuth();
   const { blockedWords } = useSettings();
   const { tap, success } = useFeedback();
@@ -324,7 +324,11 @@ export default function LateNightScreen() {
   useEffect(() => {
     if (!user) return;
     setLoadingNight(true);
-    svc.fetchNightThoughts(user.id)
+    const excludeIds = [
+      ...blockedUsers.map(b => b.id),
+      ...mutedUsers.map(m => m.id),
+    ];
+    svc.fetchNightThoughts(user.id, excludeIds)
       .then(data => { if (data.length > 0) setNightFeed(data); })
       .catch(() => {})
       .finally(() => setLoadingNight(false));
@@ -349,16 +353,19 @@ export default function LateNightScreen() {
           // Skip thoughts we already have (our own optimistic entries)
           if (!row?.id) return;
 
+          // Server-side guard: skip before any extra fetch if author is known blocked/muted
+          if (row.author_id && (isBlocked(row.author_id) || isMuted(row.author_id))) return;
+
           // Fetch the full thought with profile join + user interactions
           const { data } = await supabase
             .from("thoughts")
-            .select("*, profiles!thoughts_author_id_fkey(display_name, username)")
+            .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
             .eq("id", row.id)
             .single();
 
           if (!data) return;
 
-          // Skip thoughts from blocked or muted users
+          // Final guard in case block/mute state changed after the preflight check
           if (isBlocked(data.author_id) || isMuted(data.author_id)) return;
 
           const interactions = await svc.fetchUserInteractions(user.id, [row.id]);
