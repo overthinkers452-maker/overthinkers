@@ -21,7 +21,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { themeMode, setThemeMode } = useTheme();
-  const { translateLang, setTranslateLang, currentUser, thoughts, blockedUsers } = useApp();
+  const { translateLang, setTranslateLang, currentUser, thoughts, blockedUsers, mutedUsers } = useApp();
   const {
     hapticsEnabled, setHapticsEnabled,
     soundEnabled, setSoundEnabled,
@@ -35,7 +35,7 @@ export default function SettingsScreen() {
   } = useSettings();
   const modal = useModal();
   const { showToast } = useToast();
-  const { signOut, deleteAccount } = useAuth();
+  const { signOut, deleteAccount, profile, updateProfile } = useAuth();
 
   const tr = (key: string, vars?: Record<string, string | number>) => t(appLanguage, key, vars);
 
@@ -220,9 +220,30 @@ export default function SettingsScreen() {
         {/* Privacy */}
         <Text style={styles.section}>{tr("settings.section.privacy")}</Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Row label={tr("settings.private")} icon="lock" isSwitch value={privateAccount} onPress={() => setPrivateAccount(!privateAccount)} />
+          <Row
+            label="Private Account"
+            icon="lock"
+            isSwitch
+            value={profile?.is_private ?? false}
+            onPress={() => updateProfile({ is_private: !(profile?.is_private ?? false) }).catch(() => {})}
+          />
+          <Row
+            label="Hide Appreciation Counts"
+            icon="heart"
+            isSwitch
+            value={profile?.hide_appreciations ?? false}
+            onPress={() => updateProfile({ hide_appreciations: !(profile?.hide_appreciations ?? false) }).catch(() => {})}
+          />
+          <Row
+            label="Hide Repost Counts"
+            icon="repeat"
+            isSwitch
+            value={profile?.hide_reposts ?? false}
+            onPress={() => updateProfile({ hide_reposts: !(profile?.hide_reposts ?? false) }).catch(() => {})}
+          />
           <Row label={tr("settings.hideDisagrees")} icon="eye-off" isSwitch value={hideDisagreements} onPress={() => setHideDisagreements(!hideDisagreements)} />
           <Row label={tr("settings.blockedUsers")} icon="slash" meta={blockedUsers.length ? String(blockedUsers.length) : undefined} onPress={() => router.push("/blocked")} />
+          <Row label="Muted Accounts" icon="volume-x" meta={mutedUsers.length ? String(mutedUsers.length) : undefined} onPress={() => router.push("/muted")} />
           <Row label={tr("settings.contentFilters")} icon="filter" meta={blockedWords.length ? String(blockedWords.length) : undefined} onPress={() => router.push("/content-filters")} />
         </View>
 

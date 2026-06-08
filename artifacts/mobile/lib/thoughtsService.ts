@@ -124,10 +124,11 @@ export async function fetchFeed(opts: {
   feedType: "For You" | "Trending" | "Latest" | "Following";
   category?: string | null;
   followingIds?: string[];
+  excludeIds?: string[];
   limit?: number;
   offset?: number;
 }) {
-  const { userId, feedType, category, followingIds = [], limit = 30, offset = 0 } = opts;
+  const { userId, feedType, category, followingIds = [], excludeIds = [], limit = 30, offset = 0 } = opts;
 
   let query = supabase
     .from("thoughts")
@@ -135,6 +136,10 @@ export async function fetchFeed(opts: {
     .range(offset, offset + limit - 1);
 
   if (category) query = query.eq("category", category);
+
+  if (excludeIds.length > 0) {
+    query = query.not("author_id", "in", `(${excludeIds.join(",")})`);
+  }
 
   switch (feedType) {
     case "Trending":
@@ -595,6 +600,23 @@ export async function fetchProfileById(userId: string) {
 }
 
 export async function fetchProfileThoughts(userId: string, viewerUserId?: string): Promise<Thought[]> {
+  if (viewerUserId && viewerUserId !== userId) {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("is_private")
+      .eq("id", userId)
+      .single();
+    if (prof?.is_private) {
+      const { data: follow } = await supabase
+        .from("follows")
+        .select("id")
+        .eq("follower_id", viewerUserId)
+        .eq("following_id", userId)
+        .maybeSingle();
+      if (!follow) return [];
+    }
+  }
+
   const { data } = await supabase
     .from("thoughts")
     .select("*, profiles!thoughts_author_id_fkey(display_name, username)")
@@ -662,6 +684,18 @@ export async function fetchMutedIds(userId: string): Promise<string[]> {
     .select("muted_id")
     .eq("muter_id", userId);
   return (data ?? []).map((r: any) => r.muted_id);
+}
+
+export async function fetchMutedUsers(userId: string): Promise<{ id: string; name: string; username: string }[]> {
+  const { data } = await supabase
+    .from("mutes")
+    .select("muted_id, profiles!mutes_muted_id_fkey(display_name, username)")
+    .eq("muter_id", userId);
+  return (data ?? []).map((r: any) => ({
+    id: r.muted_id,
+    name: r.profiles?.display_name ?? r.profiles?.username ?? r.muted_id,
+    username: r.profiles?.username ?? "",
+  }));
 }
 
 export async function muteUser(muterId: string, mutedId: string): Promise<void> {

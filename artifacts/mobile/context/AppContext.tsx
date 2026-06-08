@@ -107,6 +107,7 @@ export type ReportResult = { ok: boolean; message: string };
 
 export interface TranslateLang { code: string; label: string; roman?: boolean; }
 export interface BlockedUser { id: string; name: string; }
+export interface MutedUser { id: string; name: string; username: string; }
 
 interface AppContextType {
   thoughts: Thought[];
@@ -130,6 +131,10 @@ interface AppContextType {
   blockUser: (userId: string, name: string) => void;
   unblockUser: (userId: string) => void;
   isBlocked: (userId: string) => boolean;
+  mutedUsers: MutedUser[];
+  muteUser: (userId: string, name: string, username?: string) => void;
+  unmuteUser: (userId: string) => void;
+  isMuted: (userId: string) => boolean;
   canChangeUsername: () => { allowed: boolean; nextChangeAt?: string };
   addThought: (thought: Omit<Thought, "id"|"createdAt"|"qualityScore"|"appreciations"|"disagreements"|"reposts"|"saves"|"comments"|"reportCount"|"hasAppreciated"|"hasDisagreed"|"hasSaved"|"hasReposted"|"hasReported"|"isEdited"|"editedAt"|"isRepost"|"originalAuthorName"|"originalAuthorId">) => void;
   editThought: (thoughtId: string, newContent: string) => boolean;
@@ -199,6 +204,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [followedUsers, setFollowedUsers] = useState<Set<string>>(new Set());
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
+  const [mutedUsers, setMutedUsers] = useState<MutedUser[]>([]);
   const reportLog = useRef<number[]>([]);
 
   // Derive currentUser from auth profile or default
@@ -251,12 +257,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setFeedLoading(true);
     feedOffsetRef.current = 0;
+    const excludeIds = [...blockedUsers.map(b => b.id), ...mutedUsers.map(m => m.id)];
     try {
       const data = await svc.fetchFeed({
         userId: user.id,
         feedType,
         category,
         followingIds,
+        excludeIds,
         limit: FEED_PAGE_SIZE,
         offset: 0,
       });
@@ -268,17 +276,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setFeedLoading(false);
     }
-  }, [user, followingIds]);
+  }, [user, followingIds, blockedUsers, mutedUsers]);
 
   const loadMoreFeed = useCallback(async (feedType: FeedType = "For You", category: string | null = null) => {
     if (!user || feedLoadingMore || !hasMoreFeed) return;
     setFeedLoadingMore(true);
+    const excludeIds = [...blockedUsers.map(b => b.id), ...mutedUsers.map(m => m.id)];
     try {
       const data = await svc.fetchFeed({
         userId: user.id,
         feedType,
         category,
         followingIds,
+        excludeIds,
         limit: FEED_PAGE_SIZE,
         offset: feedOffsetRef.current,
       });
@@ -296,7 +306,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setFeedLoadingMore(false);
     }
-  }, [user, followingIds, feedLoadingMore, hasMoreFeed]);
+  }, [user, followingIds, blockedUsers, mutedUsers, feedLoadingMore, hasMoreFeed]);
 
   const refreshComments = useCallback(async (thoughtId: string) => {
     if (!user) return;
@@ -330,6 +340,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }).catch(() => {});
     svc.fetchBlockedUsers(user.id).then(users => {
       setBlockedUsers(users);
+    }).catch(() => {});
+    svc.fetchMutedUsers(user.id).then(users => {
+      setMutedUsers(users);
     }).catch(() => {});
     refreshNotifications();
     refreshSaved();
@@ -410,6 +423,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const isBlocked = useCallback((userId: string) => blockedUsers.some(b => b.id === userId), [blockedUsers]);
+
+  // ─── Mute ──────────────────────────────────────────────────────────────────
+
+  const muteUser = useCallback((userId: string, name: string, username = "") => {
+    setMutedUsers(prev => {
+      if (prev.some(m => m.id === userId)) return prev;
+      return [...prev, { id: userId, name, username }];
+    });
+    if (user) svc.muteUser(user.id, userId).catch(() => {});
+  }, [user]);
+
+  const unmuteUser = useCallback((userId: string) => {
+    setMutedUsers(prev => prev.filter(m => m.id !== userId));
+    if (user) svc.unmuteUser(user.id, userId).catch(() => {});
+  }, [user]);
+
+  const isMuted = useCallback((userId: string) => mutedUsers.some(m => m.id === userId), [mutedUsers]);
 
   // ─── Profile editing ───────────────────────────────────────────────────────
 
@@ -688,6 +718,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       translateLang, setTranslateLang, fleetingThoughts, addFleetingThought,
       followedUsers, followingIds, toggleFollowUser,
       blockedUsers, blockUser, unblockUser, isBlocked,
+      mutedUsers, muteUser, unmuteUser, isMuted,
       canChangeUsername,
       addThought, editThought, deleteThought,
       toggleAppreciate, toggleDisagree, toggleSave, toggleRepost, reportThought,

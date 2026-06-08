@@ -5,6 +5,7 @@ import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useApp, Thought } from "@/context/AppContext";
+import { useModal } from "@/context/ModalContext";
 import { useAuth } from "@/context/AuthContext";
 import { ThoughtCard } from "@/components/ThoughtCard";
 import { formatCount } from "@/utils/format";
@@ -27,6 +28,7 @@ interface ProfileData {
   followers_count: number;
   following_count: number;
   thoughts_count: number;
+  is_private: boolean;
 }
 
 export default function PublicProfileScreen() {
@@ -34,7 +36,8 @@ export default function PublicProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { userId } = useLocalSearchParams<{ userId: string }>();
-  const { currentUser, followedUsers, toggleFollowUser } = useApp();
+  const { currentUser, followedUsers, toggleFollowUser, mutedUsers, muteUser, unmuteUser, isMuted } = useApp();
+  const modal = useModal();
   const { user } = useAuth();
   const { tap } = useFeedback();
   const { scale, bounce } = useBounce();
@@ -47,6 +50,8 @@ export default function PublicProfileScreen() {
   const safeUserId = userId ?? "";
   const isOwnProfile = safeUserId === currentUser.id;
   const isFollowed = followedUsers.has(safeUserId);
+  const isMutedUser = isMuted(safeUserId);
+  const isPrivateAndHidden = !isOwnProfile && !isFollowed && (profile?.is_private ?? false);
 
   useEffect(() => {
     if (!safeUserId) return;
@@ -100,6 +105,32 @@ export default function PublicProfileScreen() {
         headerStyle: { backgroundColor: colors.background } as any,
         headerTitleStyle: { fontFamily: "Inter_600SemiBold", color: colors.foreground } as any,
         headerTintColor: colors.primary,
+        headerRight: !isOwnProfile ? () => (
+          <TouchableOpacity
+            onPress={() => modal.sheet({
+              title: profile?.display_name ?? "User",
+              actions: [
+                {
+                  label: isMutedUser ? `Unmute @${profile?.username ?? ""}` : `Mute @${profile?.username ?? ""}`,
+                  icon: isMutedUser ? "volume-2" : "volume-x",
+                  onPress: () => {
+                    if (isMutedUser) {
+                      unmuteUser(safeUserId);
+                      tap();
+                    } else {
+                      muteUser(safeUserId, profile?.display_name ?? safeUserId, profile?.username);
+                      tap();
+                    }
+                  },
+                },
+              ],
+            })}
+            style={{ paddingHorizontal: 12, paddingVertical: 8 }}
+            activeOpacity={0.7}
+          >
+            <Feather name="more-horizontal" size={22} color={colors.foreground} />
+          </TouchableOpacity>
+        ) : undefined,
       }} />
       <FlatList
         style={{ backgroundColor: colors.background }}
@@ -193,10 +224,18 @@ export default function PublicProfileScreen() {
           </View>
         }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Feather name="edit-2" size={28} color={colors.mutedForeground} />
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No public thoughts yet.</Text>
-          </View>
+          isPrivateAndHidden ? (
+            <View style={styles.privateGate}>
+              <Feather name="lock" size={36} color={colors.mutedForeground} />
+              <Text style={[styles.privateTitle, { color: colors.foreground }]}>This account is private</Text>
+              <Text style={[styles.privateSubtitle, { color: colors.mutedForeground }]}>Follow this account to see their thoughts</Text>
+            </View>
+          ) : (
+            <View style={styles.empty}>
+              <Feather name="edit-2" size={28} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No public thoughts yet.</Text>
+            </View>
+          )
         }
       />
     </>
@@ -228,5 +267,8 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     sectionLabelText: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 1 },
     empty: { paddingTop: 60, alignItems: "center", gap: 8 },
     emptyText: { fontSize: 14, fontFamily: "Inter_400Regular" },
+    privateGate: { paddingTop: 64, alignItems: "center", gap: 12, paddingHorizontal: 32 },
+    privateTitle: { fontSize: 17, fontFamily: "Inter_700Bold", textAlign: "center" },
+    privateSubtitle: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
   });
 }

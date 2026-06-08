@@ -15,6 +15,11 @@ export interface AuthProfile {
   following_count: number;
   thoughts_count: number;
   username_changed_at: string | null;
+  is_private: boolean;
+  hide_appreciations: boolean;
+  hide_reposts: boolean;
+  is_admin: boolean;
+  strike_count: number;
 }
 
 interface AuthContextType {
