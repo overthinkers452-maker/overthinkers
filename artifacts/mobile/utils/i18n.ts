@@ -32,7 +32,7 @@ const en: Dict = {
   // Navigation / tabs
   "nav.home": "Home",
   "nav.explore": "Explore",
-  "nav.latenight": "Late Night",
+  "nav.latenight": "4 AM",
   "nav.profile": "Profile",
   "nav.settings": "Settings",
   "nav.search": "Search",
@@ -201,7 +201,7 @@ const hi: Dict = {
   // Navigation / tabs
   "nav.home": "होम",
   "nav.explore": "एक्सप्लोर",
-  "nav.latenight": "लेट नाइट",
+  "nav.latenight": "4 AM",
   "nav.profile": "प्रोफ़ाइल",
   "nav.settings": "सेटिंग्स",
   "nav.search": "खोजें",

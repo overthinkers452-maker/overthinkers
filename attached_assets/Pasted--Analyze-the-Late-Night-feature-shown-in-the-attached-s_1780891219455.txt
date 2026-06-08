@@ -1,0 +1,187 @@
+[Analyze the Late Night feature shown in the attached screenshot and completely redesign its workflow logic. The current implementation behaves like a fixed-time feed and does not feel truly realtime. Preserve the existing UI design, animations, branding, and visual style, but rebuild the underlying system.]
+
+Late Night → 4 AM Mode
+
+Rename the feature everywhere:
+
+- "Late Night" → "4 AM"
+- Update all labels, navigation items, headers, notifications, settings, analytics events, and database references.
+- Ensure no old "Late Night" naming remains.
+
+Realtime Time-Based Workflow
+
+The current implementation appears to be showing static/open-close messaging.
+
+Replace it with a fully realtime system.
+
+Requirements:
+
+Operating Window
+
+4 AM Mode should automatically become active based on the user's local timezone.
+
+Active Hours:
+
+- Opens: 4:00 AM
+- Closes: configurable from Admin Settings
+
+The state must update instantly without requiring:
+
+- App restart
+- Manual refresh
+- Screen reload
+
+Use:
+
+- Realtime timers
+- Live state updates
+- Background foreground synchronization
+
+Realtime Status Engine
+
+Create a centralized scheduler service.
+
+Requirements:
+
+- Detect local timezone automatically.
+- Recalculate status every minute.
+- Update all screens instantly.
+- Handle timezone changes.
+- Handle daylight saving changes.
+- Handle app resume/background transitions.
+- Handle offline/online transitions.
+
+Dynamic Feed States
+
+When Closed:
+
+Display:
+
+- Countdown until opening
+- Next opening time
+- Friendly empty-state message
+
+Example:
+
+"4 AM opens in 2h 14m"
+
+Instead of:
+
+"Opens at 10 PM"
+
+When Open:
+
+Display:
+
+- Live feed
+- Active users count
+- New thoughts appearing instantly
+- Realtime comments
+- Realtime likes
+- Realtime notifications
+
+Realtime Content Experience
+
+While 4 AM Mode is active:
+
+- New thoughts appear instantly.
+- Likes update instantly.
+- Comments update instantly.
+- Replies update instantly.
+- Feed updates without refresh.
+- Presence updates in realtime.
+
+Implement Supabase Realtime subscriptions.
+
+Feed Logic
+
+Verify:
+
+- Feed loading
+- Feed filtering
+- Feed sorting
+- Feed pagination
+- Feed refresh
+
+Fix any issues found.
+
+Ensure newest content appears immediately.
+
+UX Improvements
+
+Replace static button:
+
+"Opens at 10 PM"
+
+With dynamic states:
+
+- Opens in 3h 22m
+- Opening soon
+- Live now
+- Closing in 18m
+
+Update automatically in realtime.
+
+Database Verification
+
+Audit all related tables.
+
+Verify:
+
+- thoughts
+- comments
+- likes
+- notifications
+- user presence
+
+Create missing indexes.
+
+Optimize queries.
+
+Fix broken relationships.
+
+Performance
+
+Optimize:
+
+- Realtime listeners
+- Memory usage
+- Feed rendering
+- Subscription cleanup
+- Background synchronization
+
+Prevent duplicate subscriptions.
+
+QA Checklist
+
+Verify:
+
+✓ Opens exactly at configured time
+✓ Closes exactly at configured time
+✓ Works across timezones
+✓ Updates without refresh
+✓ Realtime feed updates work
+✓ Realtime likes work
+✓ Realtime comments work
+✓ Realtime notifications work
+✓ Countdown updates correctly
+✓ No stale state remains
+
+Deliverables
+
+Generate:
+
+/docs/4AM_MODE_AUDIT.md
+
+Include:
+
+- Existing workflow issues
+- Realtime architecture changes
+- Database changes
+- Performance improvements
+- Bugs fixed
+- Remaining issues
+
+Do not stop at renaming the feature.
+
+Completely rebuild the workflow so that 4 AM Mode feels like a modern realtime social experience powered by Supabase Realtime and live scheduling.

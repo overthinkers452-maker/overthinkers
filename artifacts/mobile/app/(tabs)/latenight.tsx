@@ -13,6 +13,7 @@ import { useFeedback } from "@/hooks/useFeedback";
 import { useModal } from "@/context/ModalContext";
 import { applyFeedFilters } from "@/utils/feedFilter";
 import * as svc from "@/lib/thoughtsService";
+import { supabase } from "@/lib/supabase";
 
 // ─── Time helpers ─────────────────────────────────────────────────────────────
 
@@ -27,8 +28,8 @@ function tzAbbr() {
   } catch { return ""; }
 }
 
-const OPEN_HOUR = 22; // 10 PM
-const CLOSE_HOUR = 4; // 4 AM
+const OPEN_HOUR = 22;  // 10 PM
+const CLOSE_HOUR = 4;  // 4 AM
 
 /** The feed is open from 10 PM through 4 AM (local time). */
 function isNightOpen(d: Date = new Date()) {
@@ -36,13 +37,66 @@ function isNightOpen(d: Date = new Date()) {
   return h >= OPEN_HOUR || h < CLOSE_HOUR;
 }
 
+/** Minutes remaining until the feed opens (only call when closed). */
+function minutesUntilOpen(d: Date = new Date()): number {
+  const h = d.getHours();
+  const m = d.getMinutes();
+  const nowMins = h * 60 + m;
+  const openMins = OPEN_HOUR * 60;
+  return nowMins < openMins ? openMins - nowMins : 0;
+}
+
+/** Minutes remaining until the feed closes (only call when open). */
+function minutesUntilClose(d: Date = new Date()): number {
+  const h = d.getHours();
+  const m = d.getMinutes();
+  const nowMins = h * 60 + m;
+  const closeMins = CLOSE_HOUR * 60;
+  return h >= OPEN_HOUR
+    ? (24 * 60 - nowMins) + closeMins
+    : Math.max(0, closeMins - nowMins);
+}
+
+function fmtCountdown(mins: number): string {
+  if (mins <= 0) return "any moment";
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}
+
+interface DynamicStatus {
+  label: string;
+  fabLabel: string;
+  isOpen: boolean;
+  urgency: "normal" | "soon";
+}
+
+function getDynamicStatus(d: Date = new Date()): DynamicStatus {
+  const open = isNightOpen(d);
+  if (open) {
+    const mins = minutesUntilClose(d);
+    if (mins <= 30) {
+      return { label: `Closing in ${fmtCountdown(mins)}`, fabLabel: `Closing in ${fmtCountdown(mins)}`, isOpen: true, urgency: "soon" };
+    }
+    return { label: `Live now · closes in ${fmtCountdown(mins)}`, fabLabel: "Share now", isOpen: true, urgency: "normal" };
+  } else {
+    const mins = minutesUntilOpen(d);
+    if (mins <= 30) {
+      return { label: `Opening soon · in ${fmtCountdown(mins)}`, fabLabel: `Opening soon`, isOpen: false, urgency: "soon" };
+    }
+    return { label: `4 AM opens in ${fmtCountdown(mins)}`, fabLabel: `Opens in ${fmtCountdown(mins)}`, isOpen: false, urgency: "normal" };
+  }
+}
+
 // ─── Night badges ─────────────────────────────────────────────────────────────
 
 const NIGHT_BADGES = [
-  { id: "night_owl",    label: "Night Owl",       emoji: "🦉",  color: "#A78BFA", min: 1 },
-  { id: "night_thinker",label: "Night Thinker",   emoji: "🌙",  color: "#818CF8", min: 5 },
-  { id: "moon_child",   label: "Moon Child",      emoji: "🌕",  color: "#C4B5FD", min: 10 },
-  { id: "nocturnal_sage",label:"Nocturnal Sage",  emoji: "⭐",  color: "#F9A8D4", min: 20 },
+  { id: "night_owl",      label: "Night Owl",      emoji: "🦉",  color: "#A78BFA", min: 1 },
+  { id: "night_thinker",  label: "Night Thinker",  emoji: "🌙",  color: "#818CF8", min: 5 },
+  { id: "moon_child",     label: "Moon Child",     emoji: "🌕",  color: "#C4B5FD", min: 10 },
+  { id: "nocturnal_sage", label: "Nocturnal Sage", emoji: "⭐",  color: "#F9A8D4", min: 20 },
 ];
 
 function getNightBadge(count: number) {
@@ -52,19 +106,20 @@ function getNightBadge(count: number) {
 // ─── Palette — always dark/moody regardless of app theme ─────────────────────
 
 const NIGHT = {
-  bg:        "#05051A",
-  surface:   "#0D0D2E",
-  card:      "#12123A",
-  border:    "#1E1E50",
-  primary:   "#7C3AED",
-  accent:    "#C4B5FD",
-  star:      "#F9A8D4",
-  muted:     "#6B6BAA",
-  text:      "#E8E8FF",
-  subtext:   "#9999CC",
+  bg:      "#05051A",
+  surface: "#0D0D2E",
+  card:    "#12123A",
+  border:  "#1E1E50",
+  primary: "#7C3AED",
+  accent:  "#C4B5FD",
+  star:    "#F9A8D4",
+  muted:   "#6B6BAA",
+  text:    "#E8E8FF",
+  subtext: "#9999CC",
+  warn:    "#FBBF24",
 };
 
-const STARS = ["✦","✧","⋆","·","✦","⋆","·","✧","✦","·","⋆","✦"];
+const STARS = ["✦", "✧", "⋆", "·", "✦", "⋆", "·", "✧", "✦", "·", "⋆", "✦"];
 
 // ─── Starfield ────────────────────────────────────────────────────────────────
 
@@ -109,7 +164,7 @@ const sf = StyleSheet.create({
   star: { position: "absolute", color: "#C4B5FD" },
 });
 
-// ─── Compose modal — posts instantly ───────────────────────────────────────────
+// ─── Compose modal ────────────────────────────────────────────────────────────
 
 function ComposeModal({ visible, onClose, onSubmit }: {
   visible: boolean; onClose: () => void; onSubmit: (text: string) => void;
@@ -149,11 +204,11 @@ function ComposeModal({ visible, onClose, onSubmit }: {
           <View style={cm.liveNote}>
             <Feather name="zap" size={13} color={NIGHT.accent} />
             <Text style={cm.liveNoteText}>
-              Posts <Text style={{ color: NIGHT.accent, fontFamily: "Inter_600SemiBold" }}>live, right now</Text> to the Late Night feed
+              Posts <Text style={{ color: NIGHT.accent, fontFamily: "Inter_600SemiBold" }}>live, right now</Text> to the 4 AM feed
             </Text>
           </View>
           <View style={cm.footer}>
-            <Text style={[cm.counter, remaining < 40 && { color: remaining < 10 ? "#EF4444" : "#FBBF24" }]}>
+            <Text style={[cm.counter, remaining < 40 && { color: remaining < 10 ? "#EF4444" : NIGHT.warn }]}>
               {remaining}
             </Text>
             <TouchableOpacity
@@ -189,7 +244,7 @@ const cm = StyleSheet.create({
   submitText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });
 
-// ─── Published night thought card ──────────────────────────────────────────────
+// ─── Published night thought card ─────────────────────────────────────────────
 
 function NightThoughtCard({ content, author, alias, postingMode, createdAt, appreciations, hasAppreciated, onAppreciate }: {
   content: string; author: string; alias?: string; postingMode: string;
@@ -210,7 +265,7 @@ function NightThoughtCard({ content, author, alias, postingMode, createdAt, appr
           <Text style={nc.time}>{timeAgo(createdAt)}</Text>
         </View>
         <View style={nc.postedChip}>
-          <Feather name="check" size={10} color={NIGHT.accent} />
+          <Feather name="zap" size={10} color={NIGHT.accent} />
           <Text style={nc.postedChipText}>Live</Text>
         </View>
       </View>
@@ -253,17 +308,19 @@ export default function LateNightScreen() {
   const modal = useModal();
 
   const [showCompose, setShowCompose] = useState(false);
-  const [nightOpen, setNightOpen] = useState(() => isNightOpen());
+  const [status, setStatus] = useState<DynamicStatus>(() => getDynamicStatus());
   const [nightFeed, setNightFeed] = useState<Thought[]>([]);
   const [loadingNight, setLoadingNight] = useState(false);
 
-  // Re-evaluate the open/closed window periodically so the UI flips at 10 PM / 4 AM.
+  // ─── 1-minute realtime clock — updates status label and open/closed state ──
   useEffect(() => {
-    const id = setInterval(() => setNightOpen(isNightOpen()), 30_000);
+    const tick = () => setStatus(getDynamicStatus());
+    tick();
+    const id = setInterval(tick, 60_000);
     return () => clearInterval(id);
   }, []);
 
-  // Load night thoughts from Supabase
+  // ─── Load initial night thoughts from Supabase ────────────────────────────
   useEffect(() => {
     if (!user) return;
     setLoadingNight(true);
@@ -271,6 +328,78 @@ export default function LateNightScreen() {
       .then(data => { if (data.length > 0) setNightFeed(data); })
       .catch(() => {})
       .finally(() => setLoadingNight(false));
+  }, [user]);
+
+  // ─── Supabase Realtime subscription for live 4 AM feed ───────────────────
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel("4am-feed-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "thoughts",
+          filter: "is_night_thought=eq.true",
+        },
+        async (payload) => {
+          const row = payload.new as any;
+          // Skip thoughts we already have (our own optimistic entries)
+          if (!row?.id) return;
+
+          // Fetch the full thought with profile join + user interactions
+          const { data } = await supabase
+            .from("thoughts")
+            .select("*, profiles!thoughts_author_id_fkey(display_name, username)")
+            .eq("id", row.id)
+            .single();
+
+          if (!data) return;
+
+          const interactions = await svc.fetchUserInteractions(user.id, [row.id]);
+          // Map manually since mapDbThought is not exported
+          const newThought: Thought = {
+            id: data.id,
+            content: data.content,
+            authorId: data.author_id,
+            authorName: data.profiles?.display_name ?? "Unknown",
+            authorUsername: data.profiles?.username ?? "",
+            postingMode: data.posting_mode,
+            alias: data.alias ?? undefined,
+            category: data.category,
+            appreciations: data.appreciations,
+            disagreements: data.disagreements,
+            reposts: data.reposts,
+            saves: data.saves,
+            comments: data.comments,
+            reportCount: data.report_count,
+            qualityScore: data.quality_score,
+            createdAt: data.created_at,
+            isEdited: data.is_edited,
+            editedAt: data.edited_at ?? undefined,
+            hasAppreciated: interactions.appreciated.has(row.id),
+            hasDisagreed: interactions.disagreed.has(row.id),
+            hasSaved: interactions.saved.has(row.id),
+            hasReposted: interactions.reposted.has(row.id),
+            hasReported: interactions.reported.has(row.id),
+            type: data.type,
+            feedReason: data.feed_reason ?? undefined,
+            isRepost: data.is_repost,
+          };
+
+          setNightFeed(prev => {
+            if (prev.find(t => t.id === newThought.id)) return prev;
+            return [newThought, ...prev];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const topPad    = Platform.OS === "web" ? 67 : insets.top;
@@ -287,10 +416,9 @@ export default function LateNightScreen() {
     nightFeed.forEach(t => {
       if (!merged.find(x => x.id === t.id)) merged.push(t);
     });
-    return merged;
+    return merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [localNightThoughts, nightFeed]);
 
-  // Published night thoughts = filtered
   const nightThoughts = useMemo(
     () => applyFeedFilters(
       allNightThoughts,
@@ -326,22 +454,27 @@ export default function LateNightScreen() {
     } else {
       modal.alert({
         title: "The feed just closed 🌙",
-        message: "Late Night closes at 4:00 AM. Come back at 10:00 PM to share instantly.",
+        message: "4 AM closes at 4:00 AM. Come back at 10:00 PM to share instantly.",
       });
     }
   }, [success, postNightThought, modal]);
 
   const onPressShare = useCallback(() => {
     tap();
-    if (!isNightOpen()) {
+    if (!status.isOpen) {
       modal.alert({
         title: "The feed is asleep 🌙",
-        message: "Late Night is open from 10:00 PM to 4:00 AM. Come back during those hours to share instantly.",
+        message: "4 AM is open from 10:00 PM to 4:00 AM. Come back during those hours to share instantly.",
       });
       return;
     }
     setShowCompose(true);
-  }, [tap, modal]);
+  }, [tap, modal, status.isOpen]);
+
+  // Status bar color cues
+  const statusColor = status.urgency === "soon"
+    ? (status.isOpen ? NIGHT.warn : NIGHT.accent)
+    : (status.isOpen ? NIGHT.accent : NIGHT.muted);
 
   return (
     <View style={[s.container, { paddingTop: topPad }]}>
@@ -350,7 +483,7 @@ export default function LateNightScreen() {
       {/* Header */}
       <View style={s.header}>
         <View>
-          <Text style={s.title}>Late Night 🌙</Text>
+          <Text style={s.title}>4 AM 🌙</Text>
           <Text style={s.subtitle}>Open 10 PM–4 AM · share instantly</Text>
         </View>
         {myBadge && (
@@ -361,18 +494,19 @@ export default function LateNightScreen() {
         )}
       </View>
 
-      {/* Open / closed status */}
+      {/* Dynamic realtime status bar */}
       <View style={s.tzBar}>
-        <Feather name={nightOpen ? "zap" : "moon"} size={13} color={nightOpen ? NIGHT.accent : NIGHT.muted} />
-        {nightOpen ? (
-          <Text style={s.tzText}>
-            <Text style={{ color: NIGHT.accent, fontFamily: "Inter_600SemiBold" }}>Live now</Text> · open until 4:00 AM {tzAbbr()} · {TIMEZONE}
+        <Feather
+          name={status.isOpen ? "zap" : "moon"}
+          size={13}
+          color={statusColor}
+        />
+        <Text style={[s.tzText, { color: NIGHT.subtext }]}>
+          <Text style={{ color: statusColor, fontFamily: "Inter_600SemiBold" }}>
+            {status.label}
           </Text>
-        ) : (
-          <Text style={s.tzText}>
-            Opens at <Text style={{ color: NIGHT.accent, fontFamily: "Inter_600SemiBold" }}>10:00 PM {tzAbbr()}</Text> · {TIMEZONE}
-          </Text>
-        )}
+          {status.isOpen ? ` · ${tzAbbr()} · ${TIMEZONE}` : ` · ${TIMEZONE}`}
+        </Text>
       </View>
 
       <FlatList
@@ -420,22 +554,30 @@ export default function LateNightScreen() {
             <Text style={s.emptyMoon}>🌕</Text>
             <Text style={s.emptyTitle}>The feed is quiet</Text>
             <Text style={s.emptyText}>
-              {nightOpen
+              {status.isOpen
                 ? "Share a thought and it'll appear here instantly."
-                : "Late Night opens at 10 PM. Come back then to share instantly."}
+                : `4 AM opens at 10 PM. Come back then to share instantly.`}
             </Text>
+            {!status.isOpen && (
+              <View style={s.countdownPill}>
+                <Feather name="clock" size={12} color={NIGHT.accent} />
+                <Text style={s.countdownPillText}>{status.label}</Text>
+              </View>
+            )}
           </View>
         }
       />
 
-      {/* Compose FAB */}
+      {/* Compose FAB — dynamic label */}
       <TouchableOpacity
-        style={[s.fab, { bottom: bottomPad + 16 }, !nightOpen && s.fabClosed]}
+        style={[s.fab, { bottom: bottomPad + 16 }, !status.isOpen && s.fabClosed, status.urgency === "soon" && status.isOpen && s.fabWarning]}
         onPress={onPressShare}
         activeOpacity={0.85}
       >
-        <Text style={s.fabMoon}>{nightOpen ? "🌙" : "💤"}</Text>
-        <Text style={s.fabText}>{nightOpen ? "Share now (10 PM–4 AM)" : "Opens at 10 PM"}</Text>
+        <Text style={s.fabMoon}>{status.isOpen ? "🌙" : "💤"}</Text>
+        <Text style={[s.fabText, !status.isOpen && { color: NIGHT.subtext }]}>
+          {status.fabLabel}
+        </Text>
       </TouchableOpacity>
 
       <ComposeModal
@@ -467,7 +609,7 @@ const s = StyleSheet.create({
     backgroundColor: NIGHT.surface, paddingHorizontal: 16, paddingVertical: 10,
     borderBottomWidth: 1, borderBottomColor: NIGHT.border, zIndex: 1,
   },
-  tzText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: NIGHT.subtext },
+  tzText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular" },
   sectionLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: NIGHT.muted, letterSpacing: 1.2, marginBottom: 8, marginHorizontal: 12 },
   leaderStrip: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 8, zIndex: 1 },
   leaderLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: NIGHT.muted, letterSpacing: 1.2, marginBottom: 8 },
@@ -484,6 +626,13 @@ const s = StyleSheet.create({
   emptyMoon: { fontSize: 52 },
   emptyTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: NIGHT.text, textAlign: "center" },
   emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: NIGHT.subtext, textAlign: "center", lineHeight: 22 },
+  countdownPill: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: NIGHT.primary + "20", borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderWidth: 1, borderColor: NIGHT.primary + "40", marginTop: 4,
+  },
+  countdownPillText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: NIGHT.accent },
   fab: {
     position: "absolute", left: 16, right: 16,
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
@@ -493,6 +642,7 @@ const s = StyleSheet.create({
     zIndex: 10,
   },
   fabClosed: { backgroundColor: NIGHT.surface, borderColor: NIGHT.border, shadowOpacity: 0 },
+  fabWarning: { backgroundColor: "#92400E", borderColor: NIGHT.warn + "60" },
   fabMoon: { fontSize: 18 },
   fabText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });

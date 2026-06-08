@@ -451,7 +451,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       category: "Night", appreciations: 0, disagreements: 0, reposts: 0, saves: 0, comments: 0,
       reportCount: 0, qualityScore: 0, createdAt: new Date().toISOString(), isEdited: false,
       hasAppreciated: false, hasDisagreed: false, hasSaved: false, hasReposted: false, hasReported: false,
-      type: "standard", feedReason: "Shared to the Late Night feed",
+      type: "standard", feedReason: "Shared to the 4 AM feed",
     });
     setThoughts(prev => [optimistic, ...prev]);
 

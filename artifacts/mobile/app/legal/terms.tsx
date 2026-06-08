@@ -32,8 +32,8 @@ const SECTIONS: { h: string; b: string }[] = [
     b: "You can block other users and add content filters to hide thoughts containing specific words. These controls shape your own feed and do not delete other people's content.",
   },
   {
-    h: "7. Late Night feed",
-    b: "The Late Night feed is open from 10 PM to 4 AM, when thoughts you share post live and instantly. You remain responsible for anything you post there; it is subject to the same standards as the rest of the app.",
+    h: "7. 4 AM feed",
+    b: "The 4 AM feed is open from 10 PM to 4 AM, when thoughts you share post live and instantly. You remain responsible for anything you post there; it is subject to the same standards as the rest of the app.",
   },
   {
     h: "8. Termination",

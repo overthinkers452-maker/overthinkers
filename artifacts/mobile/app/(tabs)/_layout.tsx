@@ -21,7 +21,7 @@ function NativeTabLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="latenight">
         <Icon sf={{ default: "moon.stars", selected: "moon.stars.fill" }} />
-        <Label>Late Night</Label>
+        <Label>4 AM</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="search">
         <Icon sf={{ default: "magnifyingglass", selected: "magnifyingglass" }} />
@@ -95,11 +95,11 @@ function ClassicTabLayout() {
         }}
       />
 
-      {/* 2 — Late Night */}
+      {/* 2 — 4 AM */}
       <Tabs.Screen
         name="latenight"
         options={{
-          title: "Late Night",
+          title: "4 AM",
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
               <SymbolView name={focused ? "moon.stars.fill" : "moon.stars"} tintColor={color} size={21} />
