@@ -202,6 +202,11 @@ export async function createThought(params: {
 
   await rpc("increment_profile_thoughts", { profile_id: params.authorId }).catch(() => {});
 
+  indexThoughtHashtags(data.id, params.content).catch(() => {});
+  if (params.postingMode !== "Anonymous") {
+    notifyMentions(params.content, params.authorId, data.id).catch(() => {});
+  }
+
   return mapDbThought(data, params.authorId);
 }
 
@@ -446,6 +451,10 @@ export async function createComment(params: {
     } as any).catch(() => {});
   }
 
+  if (params.postingMode !== "Anonymous") {
+    notifyMentions(params.content, params.authorId, params.thoughtId).catch(() => {});
+  }
+
   return mapDbComment(data);
 }
 
@@ -568,13 +577,16 @@ export async function markAllNotificationsRead(userId: string) {
 
 // ─── Search ───────────────────────────────────────────────────────────────────
 
-export async function searchThoughts(query: string, userId?: string): Promise<Thought[]> {
-  const { data } = await supabase
+export async function searchThoughts(query: string, userId?: string, category?: string | null): Promise<Thought[]> {
+  let q = supabase
     .from("thoughts")
     .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
     .textSearch("content", query, { type: "websearch" })
     .limit(30);
 
+  if (category) q = q.eq("category", category);
+
+  const { data } = await q;
   if (!data) return [];
   const ids = data.map((r: any) => r.id);
   const interactions = userId ? await fetchUserInteractions(userId, ids) : undefined;
@@ -745,6 +757,47 @@ export async function logSecurityEvent(
     event_type: eventType,
     metadata: metadata ?? null,
   });
+}
+
+// ─── Mentions ─────────────────────────────────────────────────────────────────
+
+const MENTION_RE = /@([a-zA-Z0-9_]{2,30})(?=[^a-zA-Z0-9_]|$)/g;
+
+function extractMentions(content: string): string[] {
+  const names: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = MENTION_RE.exec(content)) !== null) names.push(m[1].toLowerCase());
+  MENTION_RE.lastIndex = 0;
+  return [...new Set(names)];
+}
+
+export async function notifyMentions(
+  content: string,
+  authorId: string,
+  thoughtId: string,
+): Promise<void> {
+  const usernames = extractMentions(content).slice(0, 5);
+  if (usernames.length === 0) return;
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id")
+    .in("username", usernames);
+
+  const recipientIds = (profiles ?? [])
+    .map((p: any) => p.id as string)
+    .filter(id => id !== authorId);
+
+  if (recipientIds.length === 0) return;
+
+  const rows = recipientIds.map(uid => ({
+    user_id: uid,
+    type: "mention" as const,
+    actor_id: authorId,
+    thought_id: thoughtId,
+  }));
+
+  await supabase.from("notifications").insert(rows).then(undefined, () => {});
 }
 
 // ─── Hashtags ─────────────────────────────────────────────────────────────────

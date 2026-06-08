@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity,
   ScrollView, Platform, ActivityIndicator,
@@ -14,7 +14,9 @@ import { formatCount } from "@/utils/format";
 import * as svc from "@/lib/thoughtsService";
 
 const TRENDING = ["consciousness", "AI relationships", "free will", "loneliness", "identity", "productivity"];
-type ResultTab = "Thoughts" | "People";
+const CATEGORIES = ["Philosophy", "Psychology", "Tech", "Society", "Culture", "Science", "Health", "Politics", "Relationships", "Creativity"];
+
+type ResultTab = "Thoughts" | "People" | "Hashtags";
 
 interface PersonResult {
   id: string;
@@ -26,64 +28,76 @@ interface PersonResult {
   thoughts_count: number;
 }
 
+interface HashtagResult {
+  id: string;
+  tag: string;
+  usage_count: number;
+}
+
 export default function SearchTabScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { followedUsers, toggleFollowUser } = useApp();
   const { user } = useAuth();
+
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<ResultTab>("Thoughts");
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [thoughtResults, setThoughtResults] = useState<Thought[]>([]);
   const [peopleResults, setPeopleResults] = useState<PersonResult[]>([]);
+  const [hashtagResults, setHashtagResults] = useState<HashtagResult[]>([]);
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : 56 + insets.bottom;
 
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!query.trim()) {
+  const runSearch = useCallback(async (q: string, cat: string | null) => {
+    if (!q.trim()) {
       setThoughtResults([]);
       setPeopleResults([]);
+      setHashtagResults([]);
       return;
     }
-    debounceRef.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const [tRes, pRes] = await Promise.all([
-          svc.searchThoughts(query.trim(), user?.id),
-          svc.searchProfiles(query.trim()),
-        ]);
-        setThoughtResults(tRes);
-        setPeopleResults(pRes as PersonResult[]);
-      } catch {
-        // keep previous results
-      } finally {
-        setSearching(false);
-      }
-    }, 400);
+    setSearching(true);
+    try {
+      const [tRes, pRes, hRes] = await Promise.all([
+        svc.searchThoughts(q.trim(), user?.id, cat),
+        svc.searchProfiles(q.trim()),
+        svc.searchHashtags(q.trim()),
+      ]);
+      setThoughtResults(tRes);
+      setPeopleResults(pRes as PersonResult[]);
+      setHashtagResults(hRes as HashtagResult[]);
+    } catch {
+      // keep previous results
+    } finally {
+      setSearching(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => runSearch(query, categoryFilter), 400);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [query, user?.id]);
+  }, [query, categoryFilter, runSearch]);
 
   const hasQuery = query.trim().length > 0;
-  const totalResults = tab === "Thoughts" ? thoughtResults.length : peopleResults.length;
+  const totalResults = tab === "Thoughts" ? thoughtResults.length : tab === "People" ? peopleResults.length : hashtagResults.length;
   const styles = makeStyles(colors);
 
   return (
     <View style={[styles.container, { paddingTop: topPad, backgroundColor: colors.background }]}>
-      {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>Search</Text>
       </View>
 
-      {/* Search input */}
       <View style={[styles.inputWrap, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
         <Feather name="search" size={15} color={colors.mutedForeground} />
         <TextInput
           style={[styles.input, { color: colors.foreground }]}
-          placeholder="Search thoughts, people, topics..."
+          placeholder="Search thoughts, people, hashtags..."
           placeholderTextColor={colors.mutedForeground}
           value={query}
           onChangeText={setQuery}
@@ -97,7 +111,6 @@ export default function SearchTabScreen() {
       </View>
 
       {!hasQuery ? (
-        /* Trending topics */
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: bottomPad }}>
           <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>TRENDING SEARCHES</Text>
           {TRENDING.map(term => (
@@ -119,7 +132,7 @@ export default function SearchTabScreen() {
         <>
           {/* Result tabs */}
           <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
-            {(["Thoughts", "People"] as ResultTab[]).map(t => (
+            {(["Thoughts", "People", "Hashtags"] as ResultTab[]).map(t => (
               <TouchableOpacity key={t} onPress={() => setTab(t)} style={[styles.tab, tab === t && styles.tabActive]} activeOpacity={0.7}>
                 <Text style={[styles.tabText, { color: tab === t ? colors.primary : colors.mutedForeground, fontFamily: tab === t ? "Inter_600SemiBold" : "Inter_400Regular" }]}>
                   {t}
@@ -127,8 +140,40 @@ export default function SearchTabScreen() {
                 {tab === t && <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />}
               </TouchableOpacity>
             ))}
-            <Text style={[styles.resultCount, { color: colors.mutedForeground }]}>{totalResults} results</Text>
+            {searching ? (
+              <ActivityIndicator size={12} color={colors.mutedForeground} style={{ marginLeft: "auto", marginRight: 4 }} />
+            ) : (
+              <Text style={[styles.resultCount, { color: colors.mutedForeground }]}>{totalResults} results</Text>
+            )}
           </View>
+
+          {/* Category filter row — only shown in Thoughts tab */}
+          {tab === "Thoughts" && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={[styles.categoryBar, { borderBottomColor: colors.border }]}
+              contentContainerStyle={styles.categoryContent}
+            >
+              <TouchableOpacity
+                onPress={() => setCategoryFilter(null)}
+                style={[styles.catChip, { backgroundColor: !categoryFilter ? colors.primary : colors.secondary, borderColor: !categoryFilter ? colors.primary : colors.border }]}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.catText, { color: !categoryFilter ? "#fff" : colors.foreground }]}>All</Text>
+              </TouchableOpacity>
+              {CATEGORIES.map(cat => (
+                <TouchableOpacity
+                  key={cat}
+                  onPress={() => setCategoryFilter(categoryFilter === cat ? null : cat)}
+                  style={[styles.catChip, { backgroundColor: categoryFilter === cat ? colors.primary : colors.secondary, borderColor: categoryFilter === cat ? colors.primary : colors.border }]}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.catText, { color: categoryFilter === cat ? "#fff" : colors.foreground }]}>{cat}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
 
           {tab === "Thoughts" ? (
             <FlatList
@@ -144,7 +189,7 @@ export default function SearchTabScreen() {
                 </View>
               }
             />
-          ) : (
+          ) : tab === "People" ? (
             <FlatList
               data={peopleResults}
               keyExtractor={item => item.id}
@@ -188,6 +233,36 @@ export default function SearchTabScreen() {
                 </View>
               }
             />
+          ) : (
+            /* Hashtags tab */
+            <FlatList
+              data={hashtagResults}
+              keyExtractor={item => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: bottomPad }}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  onPress={() => router.push({ pathname: "/hashtag/[tag]", params: { tag: item.tag } })}
+                  style={[styles.hashtagRow, { borderBottomColor: colors.border }]}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.hashtagIcon, { backgroundColor: colors.primary + "18" }]}>
+                    <Text style={[styles.hashtagSymbol, { color: colors.primary }]}>#</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.hashtagName, { color: colors.foreground }]}>#{item.tag}</Text>
+                    <Text style={[styles.hashtagCount, { color: colors.mutedForeground }]}>{item.usage_count} thoughts</Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={styles.empty}>
+                  <Feather name="hash" size={28} color={colors.mutedForeground} />
+                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No hashtags matching "{query}"</Text>
+                </View>
+              }
+            />
           )}
         </>
       )}
@@ -212,6 +287,10 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     tabText: { fontSize: 15 },
     tabIndicator: { position: "absolute", bottom: 0, left: 0, right: 0, height: 2, borderRadius: 1 },
     resultCount: { marginLeft: "auto", fontSize: 12, fontFamily: "Inter_400Regular", paddingVertical: 12 },
+    categoryBar: { borderBottomWidth: 1 },
+    categoryContent: { paddingHorizontal: 14, paddingVertical: 10, gap: 8 },
+    catChip: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+    catText: { fontSize: 13, fontFamily: "Inter_500Medium" },
     personRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
     personAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
     personInitials: { fontSize: 15, fontFamily: "Inter_700Bold" },
@@ -219,6 +298,11 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     personMeta: { fontSize: 12, fontFamily: "Inter_400Regular" },
     followBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, borderWidth: 1 },
     followText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+    hashtagRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
+    hashtagIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+    hashtagSymbol: { fontSize: 20, fontFamily: "Inter_700Bold" },
+    hashtagName: { fontSize: 15, fontFamily: "Inter_600SemiBold", marginBottom: 2 },
+    hashtagCount: { fontSize: 12, fontFamily: "Inter_400Regular" },
     empty: { paddingTop: 60, alignItems: "center", gap: 10 },
     emptyText: { fontSize: 14, fontFamily: "Inter_400Regular" },
   });

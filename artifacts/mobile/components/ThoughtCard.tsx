@@ -16,6 +16,7 @@ import { useModal, type SheetAction } from "@/context/ModalContext";
 import { useToast } from "@/context/ToastContext";
 import { modeLabel, t } from "@/utils/i18n";
 import { translateText } from "@/utils/translate";
+import * as svc from "@/lib/thoughtsService";
 
 interface Props { thought: Thought; showReason?: boolean; }
 
@@ -107,6 +108,50 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
     setTranslateLang(lang);
     doTranslate(lang);
   }, [setTranslateLang, doTranslate]);
+
+  // ─── Tappable content: hashtags and @mentions ─────────────────────────────
+  const renderContent = useCallback(() => {
+    const TOKEN_RE = /(#[a-zA-Z0-9_]{2,30}|@[a-zA-Z0-9_]{2,30})(?=[^a-zA-Z0-9_]|$)/g;
+    const segments: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    let key = 0;
+    while ((match = TOKEN_RE.exec(thought.content)) !== null) {
+      if (match.index > lastIndex) {
+        segments.push(<Text key={key++}>{thought.content.slice(lastIndex, match.index)}</Text>);
+      }
+      const token = match[0];
+      if (token.startsWith("#")) {
+        const tag = token.slice(1).toLowerCase();
+        segments.push(
+          <Text
+            key={key++}
+            style={{ color: colors.primary, fontFamily: "Inter_500Medium" }}
+            onPress={() => router.push({ pathname: "/hashtag/[tag]", params: { tag } })}
+          >{token}</Text>
+        );
+      } else {
+        const username = token.slice(1);
+        segments.push(
+          <Text
+            key={key++}
+            style={{ color: colors.primary, fontFamily: "Inter_500Medium" }}
+            onPress={() => {
+              svc.searchProfiles(username).then(results => {
+                const match = (results as any[]).find((p: any) => p.username?.toLowerCase() === username.toLowerCase());
+                if (match) router.push({ pathname: "/profile/[userId]", params: { userId: match.id } });
+              }).catch(() => {});
+            }}
+          >{token}</Text>
+        );
+      }
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < thought.content.length) {
+      segments.push(<Text key={key++}>{thought.content.slice(lastIndex)}</Text>);
+    }
+    return segments;
+  }, [thought.content, colors.primary, router]);
 
   // ─── Feature 7: Q score long-press tooltip ────────────────────────────────
   const onQPressIn = useCallback(() => {
@@ -242,7 +287,7 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
         </View>
       </View>
 
-      <Text style={s.content}>{thought.content}</Text>
+      <Text style={s.content}>{renderContent()}</Text>
 
       {/* Feature 6: inline translation */}
       {showTranslation && translatedText && (

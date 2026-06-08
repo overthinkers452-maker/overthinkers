@@ -60,3 +60,31 @@ export function calculateQualityScore(params: {
 export function withinEditWindow(createdAt: string): boolean {
   return Date.now() - new Date(createdAt).getTime() < 30 * 60 * 1000;
 }
+
+const HASHTAG_PARSE_RE = /#([a-zA-Z0-9_]{2,30})(?=[^a-zA-Z0-9_]|$)/g;
+
+/**
+ * Extracts unique lowercase hashtag names (letters/digits/underscores, 2–30 chars)
+ * from a content string, without the leading `#`.
+ */
+export function parseHashtags(content: string): string[] {
+  const tags: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = HASHTAG_PARSE_RE.exec(content)) !== null) tags.push(m[1].toLowerCase());
+  HASHTAG_PARSE_RE.lastIndex = 0;
+  return [...new Set(tags)];
+}
+
+const MENTION_PARSE_RE = /@([a-zA-Z0-9_]{2,30})(?=[^a-zA-Z0-9_]|$)/g;
+
+/**
+ * Extracts unique lowercase @mention usernames (letters/digits/underscores, 2–30 chars)
+ * from a content string, without the leading `@`.
+ */
+export function parseMentions(content: string): string[] {
+  const names: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = MENTION_PARSE_RE.exec(content)) !== null) names.push(m[1].toLowerCase());
+  MENTION_PARSE_RE.lastIndex = 0;
+  return [...new Set(names)];
+}

@@ -9,31 +9,34 @@ import { useColors } from "@/hooks/useColors";
 import { useApp, Notification } from "@/context/AppContext";
 import { timeAgo } from "@/utils/format";
 
-type Filter = "All" | "Appreciation" | "Comments" | "Follows";
-const FILTERS: Filter[] = ["All", "Appreciation", "Comments", "Follows"];
+type Filter = "All" | "Appreciation" | "Comments" | "Follows" | "Mentions";
+const FILTERS: Filter[] = ["All", "Appreciation", "Comments", "Follows", "Mentions"];
 
 const FILTER_ICONS: Record<Filter, keyof typeof Feather.glyphMap> = {
-  All: "inbox", Appreciation: "heart", Comments: "message-circle", Follows: "user-plus",
+  All: "inbox", Appreciation: "heart", Comments: "message-circle", Follows: "user-plus", Mentions: "at-sign",
 };
 const NOTIFICATION_ICON: Record<Notification["type"], keyof typeof Feather.glyphMap> = {
   appreciation: "heart", comment: "message-circle", repost: "repeat",
-  follow: "user-plus", badge: "award", reply: "corner-down-right",
+  follow: "user-plus", badge: "award", reply: "corner-down-right", mention: "at-sign",
 };
 const NOTIFICATION_BG: Record<Notification["type"], string> = {
   appreciation: "#EDE9FE", comment: "#EDE9FE", repost: "#D1FAE5",
-  follow: "#D1FAE5", badge: "#FEF3C7", reply: "#EDE9FE",
+  follow: "#D1FAE5", badge: "#FEF3C7", reply: "#EDE9FE", mention: "#FEF9C3",
 };
 const NOTIFICATION_COLOR: Record<Notification["type"], string> = {
   appreciation: "#7C3AED", comment: "#7C3AED", repost: "#059669",
-  follow: "#059669", badge: "#D97706", reply: "#7C3AED",
+  follow: "#059669", badge: "#D97706", reply: "#7C3AED", mention: "#B45309",
 };
+
 function notifMatchesFilter(n: Notification, filter: Filter): boolean {
   if (filter === "All") return true;
   if (filter === "Appreciation") return n.type === "appreciation";
   if (filter === "Comments") return n.type === "comment" || n.type === "reply";
   if (filter === "Follows") return n.type === "follow";
+  if (filter === "Mentions") return n.type === "mention";
   return true;
 }
+
 const ACTOR_LABELS: Record<Notification["type"], string> = {
   appreciation: "appreciated your thought",
   comment: "commented on your thought",
@@ -41,6 +44,7 @@ const ACTOR_LABELS: Record<Notification["type"], string> = {
   follow: "started following you",
   badge: "You earned the Regular badge. Your thoughts are gaining traction.",
   reply: "replied to your comment",
+  mention: "mentioned you in a thought",
 };
 
 export default function NotificationsScreen() {
@@ -52,12 +56,12 @@ export default function NotificationsScreen() {
   useEffect(() => {
     refreshNotifications();
   }, []);
+
   const [filter, setFilter] = useState<Filter>("All");
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : 56 + insets.bottom;
 
-  // Mark all read when user visits the tab (after a short delay for animation)
   useEffect(() => {
     const hasUnread = notifications.some(n => !n.read);
     if (!hasUnread) return;
@@ -116,7 +120,6 @@ export default function NotificationsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
-      {/* Feature 3: Search button in header */}
       <View style={styles.header}>
         <Text style={styles.title}>Alerts</Text>
         <TouchableOpacity

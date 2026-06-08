@@ -72,7 +72,7 @@ export interface Comment {
 
 export interface Notification {
   id: string;
-  type: "appreciation" | "comment" | "repost" | "follow" | "badge" | "reply";
+  type: "appreciation" | "comment" | "repost" | "follow" | "badge" | "reply" | "mention";
   actorName: string;
   actorId?: string;
   thoughtId?: string;
