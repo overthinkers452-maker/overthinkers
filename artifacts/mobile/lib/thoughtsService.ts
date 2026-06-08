@@ -891,52 +891,29 @@ export async function fetchReportQueue(): Promise<ReportGroup[]> {
 }
 
 export async function dismissReports(targetType: "thought" | "comment", targetId: string): Promise<void> {
-  const { error: logErr } = await supabase.rpc("create_moderation_action" as any, {
+  const { error } = await supabase.rpc("admin_dismiss_reports" as any, {
     p_target_type: targetType,
     p_target_id: targetId,
-    p_action: "dismiss",
   });
-  if (logErr) throw new Error(logErr.message);
-  if (targetType === "thought") {
-    await supabase.from("reports").delete().eq("thought_id", targetId);
-  } else {
-    await supabase.from("reports").delete().eq("comment_id", targetId);
-  }
+  if (error) throw new Error(error.message);
 }
 
 export async function removeContent(targetType: "thought" | "comment", targetId: string): Promise<void> {
-  const { error: logErr } = await supabase.rpc("create_moderation_action" as any, {
+  const { error } = await supabase.rpc("admin_remove_content" as any, {
     p_target_type: targetType,
     p_target_id: targetId,
-    p_action: "remove",
   });
-  if (logErr) throw new Error(logErr.message);
-  if (targetType === "thought") {
-    await supabase.from("reports").delete().eq("thought_id", targetId);
-    const { error: delErr } = await supabase.from("thoughts").delete().eq("id", targetId);
-    if (delErr) throw new Error(delErr.message);
-  } else {
-    await supabase.from("reports").delete().eq("comment_id", targetId);
-    const { error: delErr } = await supabase.from("comments").delete().eq("id", targetId);
-    if (delErr) throw new Error(delErr.message);
-  }
+  if (error) throw new Error(error.message);
 }
 
 export async function warnUser(userId: string, reason: string): Promise<void> {
-  const { error: strikeErr } = await supabase.rpc("issue_user_strike" as any, {
+  // issue_user_strike (security-definer) inserts the user_strike, moderation_action
+  // log, increments strike_count, and delivers the badge notification atomically.
+  const { error } = await supabase.rpc("issue_user_strike" as any, {
     p_user_id: userId,
     p_reason: reason,
   });
-  if (strikeErr) throw new Error(strikeErr.message);
-  await supabase.from("notifications").insert({
-    user_id: userId,
-    type: "badge" as any,
-    actor_id: null,
-    thought_id: null,
-    comment_id: null,
-    message: "Your content violated community guidelines.",
-    read: false,
-  });
+  if (error) throw new Error(error.message);
 }
 
 export async function fetchHashtagFeed(

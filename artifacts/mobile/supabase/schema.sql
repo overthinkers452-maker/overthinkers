@@ -636,3 +636,88 @@ create policy "Reports select" on public.reports
     auth.uid() = reporter_id
     OR exists (select 1 from public.profiles where id = auth.uid() and is_admin = true)
   );
+
+-- ─── NOTIFICATIONS: tighten insert policy ────────────────────────────────────
+-- Prevent any authenticated user from spoofing badge/system notifications.
+-- Regular notification types are still insertable by any authenticated user
+-- (needed for appreciation/follow/mention/etc. flows).
+-- badge and system types go only through security-definer RPCs (issue_user_strike).
+drop policy if exists "Service role can create notifications" on public.notifications;
+create policy "Authenticated users can create standard notifications" on public.notifications
+  for insert with check (
+    auth.role() = 'authenticated'
+    AND type NOT IN ('badge', 'system')
+  );
+create policy "Admins can create badge and system notifications" on public.notifications
+  for insert with check (
+    type IN ('badge', 'system')
+    AND exists (select 1 from public.profiles where id = auth.uid() and is_admin = true)
+  );
+
+-- ─── ADMIN DISMISS / REMOVE RPCs (security-definer) ──────────────────────────
+-- All admin data mutations go through these RPCs so no client-level delete
+-- policies on reports/thoughts/comments are needed for admins.
+
+create or replace function public.admin_dismiss_reports(
+  p_target_type text,
+  p_target_id uuid
+) returns void language plpgsql security definer as $$
+begin
+  if not exists (select 1 from public.profiles where id = auth.uid() and is_admin = true) then
+    raise exception 'Unauthorized: admin access required';
+  end if;
+  -- log the action first; abort if logging fails
+  insert into public.moderation_actions (moderator_id, target_type, target_id, action)
+  values (auth.uid(), p_target_type, p_target_id, 'dismiss');
+  -- clean up reports atomically
+  if p_target_type = 'thought' then
+    delete from public.reports where thought_id = p_target_id;
+  else
+    delete from public.reports where comment_id = p_target_id;
+  end if;
+end;
+$$;
+
+create or replace function public.admin_remove_content(
+  p_target_type text,
+  p_target_id uuid
+) returns void language plpgsql security definer as $$
+begin
+  if not exists (select 1 from public.profiles where id = auth.uid() and is_admin = true) then
+    raise exception 'Unauthorized: admin access required';
+  end if;
+  -- log the action first; abort if logging fails
+  insert into public.moderation_actions (moderator_id, target_type, target_id, action)
+  values (auth.uid(), p_target_type, p_target_id, 'remove');
+  -- delete content and associated reports atomically
+  if p_target_type = 'thought' then
+    delete from public.reports where thought_id = p_target_id;
+    delete from public.thoughts where id = p_target_id;
+  else
+    delete from public.reports where comment_id = p_target_id;
+    delete from public.comments where id = p_target_id;
+  end if;
+end;
+$$;
+
+-- ─── UPDATE issue_user_strike: notification now inside RPC ───────────────────
+-- Move badge notification insert into the RPC so badge type can be
+-- restricted to service-definer path only (no client-side badge insert needed).
+create or replace function public.issue_user_strike(
+  p_user_id uuid,
+  p_reason text
+)
+returns void language plpgsql security definer as $$
+begin
+  if not exists (select 1 from public.profiles where id = auth.uid() and is_admin = true) then
+    raise exception 'Unauthorized: admin access required';
+  end if;
+  insert into public.user_strikes (user_id, reason, issued_by)
+  values (p_user_id, p_reason, auth.uid());
+  insert into public.moderation_actions (moderator_id, target_type, target_id, action, note)
+  values (auth.uid(), 'user', p_user_id, 'warn', p_reason);
+  update public.profiles set strike_count = strike_count + 1 where id = p_user_id;
+  insert into public.notifications (user_id, type, actor_id, thought_id, comment_id, message)
+  values (p_user_id, 'badge', null, null, null, 'Your content violated community guidelines.');
+end;
+$$;
