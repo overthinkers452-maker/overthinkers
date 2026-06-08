@@ -50,6 +50,7 @@ export interface Thought {
   originalPostingMode?: PostingMode;
   authorHideAppreciations?: boolean;
   authorHideReposts?: boolean;
+  authorStrikeCount?: number;
 }
 
 export interface Comment {

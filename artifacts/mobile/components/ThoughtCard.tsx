@@ -277,6 +277,12 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
         </TouchableOpacity>
 
         <View style={s.headerRight}>
+          {(thought.authorStrikeCount ?? 0) >= 3 && (
+            <View style={[s.modeBadge, { backgroundColor: "#FEF3C7", borderColor: "#FCD34D" }]}>
+              <Feather name="alert-triangle" size={11} color="#D97706" />
+              <Text style={[s.modeText, { color: "#D97706" }]}>Limited</Text>
+            </View>
+          )}
           <View style={[s.modeBadge, { backgroundColor: modeColor + "18", borderColor: modeColor + "30" }]}>
             <Feather name={modeIcon} size={11} color={modeColor} />
             <Text style={[s.modeText, { color: modeColor }]}>{modeLabel(appLanguage, thought.postingMode)}</Text>

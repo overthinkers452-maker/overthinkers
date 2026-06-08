@@ -63,6 +63,7 @@ function mapDbThought(row: any, userId?: string, userInteractions?: {
     originalPostingMode: row.original_author_id ? row.posting_mode : undefined,
     authorHideAppreciations: row.profiles?.hide_appreciations ?? false,
     authorHideReposts: row.profiles?.hide_reposts ?? false,
+    authorStrikeCount: row.profiles?.strike_count ?? 0,
   };
 }
 
@@ -134,7 +135,7 @@ export async function fetchFeed(opts: {
 
   let query = supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts, strike_count)")
     .range(offset, offset + limit - 1);
 
   if (category) query = query.eq("category", category);
@@ -478,7 +479,7 @@ export async function fetchSavedThoughts(userId: string): Promise<Thought[]> {
 
   const { data } = await supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts, strike_count)")
     .in("id", ids);
 
   if (!data) return [];
@@ -576,7 +577,7 @@ export async function markAllNotificationsRead(userId: string) {
 export async function searchThoughts(query: string, userId?: string, category?: string | null): Promise<Thought[]> {
   let q = supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts, strike_count)")
     .textSearch("content", query, { type: "websearch" })
     .limit(30);
 
@@ -647,7 +648,7 @@ export async function fetchProfileThoughts(userId: string, viewerUserId?: string
 
   const { data } = await supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts, strike_count)")
     .eq("author_id", userId)
     .order("created_at", { ascending: false });
 
@@ -693,7 +694,7 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
 export async function fetchNightThoughts(userId?: string, excludeIds: string[] = []): Promise<Thought[]> {
   let query = supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts, strike_count)")
     .eq("is_night_thought", true)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -837,6 +838,105 @@ export async function searchHashtags(query: string): Promise<{ id: string; tag: 
   return data ?? [];
 }
 
+// ─── Admin / Moderation ───────────────────────────────────────────────────────
+
+export interface ReportGroup {
+  targetId: string;
+  targetType: "thought" | "comment";
+  reportCount: number;
+  latestReason: string;
+  latestAt: string;
+  authorId?: string;
+  contentSnippet?: string;
+}
+
+export async function fetchReportQueue(): Promise<ReportGroup[]> {
+  const { data, error } = await supabase
+    .from("reports")
+    .select("thought_id, comment_id, reason, created_at, thoughts(author_id, content), comments(author_id, content)")
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (error || !data) return [];
+
+  const groups: Map<string, ReportGroup> = new Map();
+  for (const r of data as any[]) {
+    const isThought = !!r.thought_id;
+    const targetId: string = r.thought_id ?? r.comment_id;
+    const targetType: "thought" | "comment" = isThought ? "thought" : "comment";
+    const key = `${targetType}:${targetId}`;
+    if (!groups.has(key)) {
+      const source = isThought ? r.thoughts : r.comments;
+      groups.set(key, {
+        targetId,
+        targetType,
+        reportCount: 1,
+        latestReason: r.reason,
+        latestAt: r.created_at,
+        authorId: source?.author_id,
+        contentSnippet: source?.content?.slice(0, 120),
+      });
+    } else {
+      const g = groups.get(key)!;
+      g.reportCount += 1;
+      if (r.created_at > g.latestAt) {
+        g.latestAt = r.created_at;
+        g.latestReason = r.reason;
+      }
+    }
+  }
+
+  return Array.from(groups.values()).sort((a, b) => b.reportCount - a.reportCount);
+}
+
+export async function dismissReports(targetType: "thought" | "comment", targetId: string): Promise<void> {
+  if (targetType === "thought") {
+    await supabase.rpc("create_moderation_action" as any, {
+      p_target_type: "thought",
+      p_target_id: targetId,
+      p_action: "dismiss",
+    });
+    await supabase.from("reports").delete().eq("thought_id", targetId);
+  } else {
+    await supabase.rpc("create_moderation_action" as any, {
+      p_target_type: "comment",
+      p_target_id: targetId,
+      p_action: "dismiss",
+    });
+    await supabase.from("reports").delete().eq("comment_id", targetId);
+  }
+}
+
+export async function removeContent(targetType: "thought" | "comment", targetId: string): Promise<void> {
+  await supabase.rpc("create_moderation_action" as any, {
+    p_target_type: targetType,
+    p_target_id: targetId,
+    p_action: "remove",
+  });
+  if (targetType === "thought") {
+    await supabase.from("reports").delete().eq("thought_id", targetId);
+    await supabase.from("thoughts").delete().eq("id", targetId);
+  } else {
+    await supabase.from("reports").delete().eq("comment_id", targetId);
+    await supabase.from("comments").delete().eq("id", targetId);
+  }
+}
+
+export async function warnUser(userId: string, reason: string): Promise<void> {
+  await supabase.rpc("issue_user_strike" as any, {
+    p_user_id: userId,
+    p_reason: reason,
+  });
+  await supabase.from("notifications").insert({
+    user_id: userId,
+    type: "badge" as any,
+    actor_id: null,
+    thought_id: null,
+    comment_id: null,
+    read: false,
+  });
+}
+
 export async function fetchHashtagFeed(
   tag: string,
   userId: string | undefined,
@@ -866,7 +966,7 @@ export async function fetchHashtagFeed(
 
   const { data } = await supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts, strike_count)")
     .in("id", thoughtIds)
     .order("created_at", { ascending: false });
 

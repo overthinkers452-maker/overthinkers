@@ -279,6 +279,16 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {/* Admin */}
+        {profile?.is_admin && (
+          <>
+            <Text style={styles.section}>Admin</Text>
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Row label="Admin Panel" icon="shield" onPress={() => router.push("/admin")} />
+            </View>
+          </>
+        )}
+
         {/* Account */}
         <Text style={styles.section}>{tr("settings.section.account")}</Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
