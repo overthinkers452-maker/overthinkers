@@ -158,8 +158,14 @@ export default function ProfileScreen() {
         aspect: kind === "avatar" ? [1, 1] : [3, 1],
         quality: 0.8,
       });
-      if (!result.canceled && result.assets[0]) {
-        applyImage(kind, result.assets[0].uri);
+      if (!result.canceled && result.assets[0] && user) {
+        try {
+          const publicUrl = await svc.uploadProfileImage(user.id, result.assets[0].uri, kind);
+          applyImage(kind, publicUrl);
+        } catch {
+          // Storage bucket not yet configured — fall back to local URI
+          applyImage(kind, result.assets[0].uri);
+        }
       }
     } catch {
       modal.alert({ title: "Couldn't open gallery", message: "Something went wrong picking an image. Please try again." });

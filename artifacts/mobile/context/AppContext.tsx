@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { calculateQualityScore } from "@/utils/format";
 import { useAuth } from "@/context/AuthContext";
 import * as svc from "@/lib/thoughtsService";
+import { supabase } from "@/lib/supabase";
 
 export type PostingMode = "Public" | "Pseudonymous" | "Anonymous";
 export type FeedType = "For You" | "Following" | "Trending" | "Latest";
@@ -327,6 +328,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setNotifications(data);
     } catch {}
   }, [user]);
+
+  // Real-time: append new notifications as they arrive without a full refetch
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`notif:${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        () => { refreshNotifications(); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, refreshNotifications]);
 
   const refreshSaved = useCallback(async () => {
     if (!user) return;

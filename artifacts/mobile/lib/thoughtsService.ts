@@ -953,3 +953,25 @@ export async function fetchHashtagFeed(
   const interactions = userId ? await fetchUserInteractions(userId, thoughtIds) : undefined;
   return data.map((row: any) => mapDbThought(row, userId, interactions));
 }
+
+// ─── Storage: Profile Images ───────────────────────────────────────────────────
+
+export async function uploadProfileImage(
+  userId: string,
+  uri: string,
+  kind: "avatar" | "banner",
+): Promise<string> {
+  const path = `${userId}/${kind}-${Date.now()}.jpg`;
+
+  const response = await fetch(uri);
+  const blob = await response.blob();
+
+  const { error } = await supabase.storage
+    .from("avatars")
+    .upload(path, blob, { contentType: "image/jpeg", upsert: true });
+
+  if (error) throw new Error(error.message);
+
+  const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+  return data.publicUrl;
+}
