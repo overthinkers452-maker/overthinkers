@@ -563,6 +563,7 @@ export async function fetchNotifications(userId: string) {
     actorId: row.actor_id ?? undefined,
     thoughtId: row.thought_id ?? undefined,
     thoughtContent: row.thought?.content ?? undefined,
+    message: row.message ?? undefined,
     createdAt: row.created_at,
     read: row.read,
   }));
@@ -890,49 +891,50 @@ export async function fetchReportQueue(): Promise<ReportGroup[]> {
 }
 
 export async function dismissReports(targetType: "thought" | "comment", targetId: string): Promise<void> {
+  const { error: logErr } = await supabase.rpc("create_moderation_action" as any, {
+    p_target_type: targetType,
+    p_target_id: targetId,
+    p_action: "dismiss",
+  });
+  if (logErr) throw new Error(logErr.message);
   if (targetType === "thought") {
-    await supabase.rpc("create_moderation_action" as any, {
-      p_target_type: "thought",
-      p_target_id: targetId,
-      p_action: "dismiss",
-    });
     await supabase.from("reports").delete().eq("thought_id", targetId);
   } else {
-    await supabase.rpc("create_moderation_action" as any, {
-      p_target_type: "comment",
-      p_target_id: targetId,
-      p_action: "dismiss",
-    });
     await supabase.from("reports").delete().eq("comment_id", targetId);
   }
 }
 
 export async function removeContent(targetType: "thought" | "comment", targetId: string): Promise<void> {
-  await supabase.rpc("create_moderation_action" as any, {
+  const { error: logErr } = await supabase.rpc("create_moderation_action" as any, {
     p_target_type: targetType,
     p_target_id: targetId,
     p_action: "remove",
   });
+  if (logErr) throw new Error(logErr.message);
   if (targetType === "thought") {
     await supabase.from("reports").delete().eq("thought_id", targetId);
-    await supabase.from("thoughts").delete().eq("id", targetId);
+    const { error: delErr } = await supabase.from("thoughts").delete().eq("id", targetId);
+    if (delErr) throw new Error(delErr.message);
   } else {
     await supabase.from("reports").delete().eq("comment_id", targetId);
-    await supabase.from("comments").delete().eq("id", targetId);
+    const { error: delErr } = await supabase.from("comments").delete().eq("id", targetId);
+    if (delErr) throw new Error(delErr.message);
   }
 }
 
 export async function warnUser(userId: string, reason: string): Promise<void> {
-  await supabase.rpc("issue_user_strike" as any, {
+  const { error: strikeErr } = await supabase.rpc("issue_user_strike" as any, {
     p_user_id: userId,
     p_reason: reason,
   });
+  if (strikeErr) throw new Error(strikeErr.message);
   await supabase.from("notifications").insert({
     user_id: userId,
     type: "badge" as any,
     actor_id: null,
     thought_id: null,
     comment_id: null,
+    message: "Your content violated community guidelines.",
     read: false,
   });
 }

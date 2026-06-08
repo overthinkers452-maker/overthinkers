@@ -27,37 +27,48 @@ export function useAdmin() {
   }, [isAdmin]);
 
   const dismiss = useCallback(async (group: ReportGroup) => {
+    if (!isAdmin) return;
     const key = `${group.targetType}:${group.targetId}`;
     setActionLoading(key);
+    setError(null);
     try {
       await svc.dismissReports(group.targetType, group.targetId);
       setQueue(q => q.filter(g => !(g.targetId === group.targetId && g.targetType === group.targetType)));
+    } catch (e: any) {
+      setError(e?.message ?? "Action failed");
     } finally {
       setActionLoading(null);
     }
-  }, []);
+  }, [isAdmin]);
 
   const remove = useCallback(async (group: ReportGroup) => {
+    if (!isAdmin) return;
     const key = `${group.targetType}:${group.targetId}`;
     setActionLoading(key);
+    setError(null);
     try {
       await svc.removeContent(group.targetType, group.targetId);
       setQueue(q => q.filter(g => !(g.targetId === group.targetId && g.targetType === group.targetType)));
+    } catch (e: any) {
+      setError(e?.message ?? "Action failed");
     } finally {
       setActionLoading(null);
     }
-  }, []);
+  }, [isAdmin]);
 
   const warn = useCallback(async (group: ReportGroup, reason: string) => {
-    if (!group.authorId) return;
+    if (!isAdmin || !group.authorId) return;
     const key = `${group.targetType}:${group.targetId}`;
     setActionLoading(key);
+    setError(null);
     try {
       await svc.warnUser(group.authorId, reason);
+    } catch (e: any) {
+      setError(e?.message ?? "Action failed");
     } finally {
       setActionLoading(null);
     }
-  }, []);
+  }, [isAdmin]);
 
   return { isAdmin, queue, loading, actionLoading, error, refresh, dismiss, remove, warn };
 }

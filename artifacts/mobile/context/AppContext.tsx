@@ -78,6 +78,7 @@ export interface Notification {
   actorId?: string;
   thoughtId?: string;
   thoughtContent?: string;
+  message?: string;
   createdAt: string;
   read: boolean;
 }

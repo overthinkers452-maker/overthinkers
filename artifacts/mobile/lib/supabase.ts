@@ -128,6 +128,7 @@ export type Database = {
           actor_id: string | null;
           thought_id: string | null;
           comment_id: string | null;
+          message: string | null;
           read: boolean;
           created_at: string;
         };

@@ -1,9 +1,9 @@
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Alert,
+  ActivityIndicator, RefreshControl, TextInput, Modal, KeyboardAvoidingView, Platform,
 } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { Stack, Redirect } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
@@ -13,34 +13,35 @@ import type { ReportGroup } from "@/lib/thoughtsService";
 
 export default function AdminScreen() {
   const colors = useColors();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isAdmin, queue, loading, actionLoading, error, refresh, dismiss, remove, warn } = useAdmin();
+
+  const [warnTarget, setWarnTarget] = useState<ReportGroup | null>(null);
+  const [warnReason, setWarnReason] = useState("");
+  const [warnBusy, setWarnBusy] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) return;
     refresh();
   }, [isAdmin, refresh]);
 
-  const onWarn = useCallback((group: ReportGroup) => {
+  const onWarnPress = useCallback((group: ReportGroup) => {
     if (!group.authorId) return;
-    Alert.prompt(
-      "Warn user",
-      "Enter the reason for this warning (it will count as a strike):",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Issue Strike",
-          style: "destructive",
-          onPress: (reason: string | undefined) => {
-            if (reason?.trim()) warn(group, reason.trim());
-          },
-        },
-      ],
-      "plain-text",
-      "",
-    );
-  }, [warn]);
+    setWarnTarget(group);
+    setWarnReason("");
+  }, []);
+
+  const onWarnSubmit = useCallback(async () => {
+    if (!warnTarget || !warnReason.trim()) return;
+    setWarnBusy(true);
+    try {
+      await warn(warnTarget, warnReason.trim());
+      setWarnTarget(null);
+      setWarnReason("");
+    } finally {
+      setWarnBusy(false);
+    }
+  }, [warnTarget, warnReason, warn]);
 
   const s = makeStyles(colors);
 
@@ -91,7 +92,7 @@ export default function AdminScreen() {
             {item.authorId && (
               <TouchableOpacity
                 style={[s.actionBtn, { backgroundColor: "#FFF7ED", borderColor: "#FDBA74" }]}
-                onPress={() => onWarn(item)}
+                onPress={() => onWarnPress(item)}
                 activeOpacity={0.7}
               >
                 <Feather name="alert-triangle" size={14} color="#F97316" />
@@ -110,23 +111,10 @@ export default function AdminScreen() {
         )}
       </View>
     );
-  }, [actionLoading, colors, dismiss, remove, onWarn, s]);
+  }, [actionLoading, colors, dismiss, remove, onWarnPress, s]);
 
   if (!isAdmin) {
-    return (
-      <>
-        <Stack.Screen options={{
-          title: "Not Found",
-          headerStyle: { backgroundColor: colors.background } as any,
-          headerTintColor: colors.primary,
-        }} />
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background }}>
-          <Feather name="lock" size={40} color={colors.mutedForeground} />
-          <Text style={{ marginTop: 16, fontSize: 16, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>Access Denied</Text>
-          <Text style={{ marginTop: 8, fontSize: 14, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Admin access required.</Text>
-        </View>
-      </>
-    );
+    return <Redirect href="/+not-found" />;
   }
 
   return (
@@ -148,34 +136,84 @@ export default function AdminScreen() {
           <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />
         }
         ListHeaderComponent={
-          <View style={s.header}>
-            <Feather name="shield" size={16} color={colors.primary} />
-            <Text style={[s.headerTitle, { color: colors.foreground }]}>
-              Report Queue
-            </Text>
-            <Text style={[s.headerCount, { color: colors.mutedForeground }]}>
-              {queue.length} item{queue.length !== 1 ? "s" : ""}
-            </Text>
+          <View>
+            <View style={s.header}>
+              <Feather name="shield" size={16} color={colors.primary} />
+              <Text style={[s.headerTitle, { color: colors.foreground }]}>Report Queue</Text>
+              <Text style={[s.headerCount, { color: colors.mutedForeground }]}>
+                {queue.length} item{queue.length !== 1 ? "s" : ""}
+              </Text>
+            </View>
+            {error && (
+              <View style={[s.errorBar, { backgroundColor: colors.disagree + "18", borderColor: colors.disagree + "30" }]}>
+                <Feather name="alert-circle" size={14} color={colors.disagree} />
+                <Text style={[s.errorText, { color: colors.disagree }]}>{error}</Text>
+              </View>
+            )}
           </View>
         }
         ListEmptyComponent={
           !loading ? (
             <View style={s.empty}>
-              {error ? (
-                <>
-                  <Feather name="alert-circle" size={36} color={colors.disagree} />
-                  <Text style={[s.emptyText, { color: colors.mutedForeground }]}>{error}</Text>
-                </>
-              ) : (
-                <>
-                  <Feather name="check-circle" size={36} color={colors.primary} />
-                  <Text style={[s.emptyText, { color: colors.mutedForeground }]}>All clear — no pending reports</Text>
-                </>
-              )}
+              <Feather name="check-circle" size={36} color={colors.primary} />
+              <Text style={[s.emptyText, { color: colors.mutedForeground }]}>All clear — no pending reports</Text>
             </View>
           ) : null
         }
       />
+
+      {/* Cross-platform warn modal with TextInput */}
+      <Modal
+        visible={warnTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setWarnTarget(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={s.modalOverlay}
+        >
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setWarnTarget(null)} />
+          <View style={[s.warnModal, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={s.warnHandle} />
+            <Text style={[s.warnTitle, { color: colors.foreground }]}>Issue Warning & Strike</Text>
+            <Text style={[s.warnSubtitle, { color: colors.mutedForeground }]}>
+              The user will receive a notification: "Your content violated community guidelines." and their strike count will increase.
+            </Text>
+            <TextInput
+              value={warnReason}
+              onChangeText={setWarnReason}
+              placeholder="Reason (shown in moderation log)…"
+              placeholderTextColor={colors.mutedForeground}
+              style={[s.warnInput, { backgroundColor: colors.secondary, borderColor: colors.border, color: colors.foreground }]}
+              multiline
+              autoFocus
+              returnKeyType="done"
+            />
+            <View style={s.warnActions}>
+              <TouchableOpacity
+                style={[s.warnBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                onPress={() => setWarnTarget(null)}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.warnBtnText, { color: colors.mutedForeground }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.warnBtn, { backgroundColor: "#F97316", borderColor: "#F97316", opacity: warnReason.trim() ? 1 : 0.4 }]}
+                onPress={onWarnSubmit}
+                activeOpacity={0.7}
+                disabled={!warnReason.trim() || warnBusy}
+              >
+                {warnBusy ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={[s.warnBtnText, { color: "#fff" }]}>Issue Strike</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </>
   );
 }
@@ -183,9 +221,11 @@ export default function AdminScreen() {
 function makeStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
     list: { paddingTop: 12, paddingHorizontal: 12 },
-    header: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, paddingBottom: 12 },
+    header: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, paddingBottom: 8 },
     headerTitle: { fontSize: 17, fontFamily: "Inter_700Bold", flex: 1 },
     headerCount: { fontSize: 13, fontFamily: "Inter_400Regular" },
+    errorBar: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10 },
+    errorText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
     card: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 10 },
     cardHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
     typePill: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
@@ -201,5 +241,14 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     actionText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
     empty: { alignItems: "center", paddingTop: 80, gap: 12 },
     emptyText: { fontSize: 15, fontFamily: "Inter_400Regular", textAlign: "center" },
+    modalOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 20 },
+    warnModal: { width: "100%", borderRadius: 20, borderWidth: 1, padding: 20 },
+    warnHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: "#ccc", alignSelf: "center", marginBottom: 16 },
+    warnTitle: { fontSize: 17, fontFamily: "Inter_700Bold", marginBottom: 8 },
+    warnSubtitle: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18, marginBottom: 14 },
+    warnInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: "Inter_400Regular", minHeight: 80, textAlignVertical: "top", marginBottom: 16 },
+    warnActions: { flexDirection: "row", gap: 10 },
+    warnBtn: { flex: 1, alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 10, paddingVertical: 12 },
+    warnBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   });
 }

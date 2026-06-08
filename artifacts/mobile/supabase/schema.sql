@@ -464,10 +464,11 @@ alter table public.profiles add column if not exists hide_reposts boolean defaul
 alter table public.profiles add column if not exists is_admin boolean default false;
 alter table public.profiles add column if not exists strike_count integer default 0;
 
--- ─── MIGRATION: Notifications — add mention type ─────────────────────────────
+-- ─── MIGRATION: Notifications — add mention type + message column ─────────────
 alter table public.notifications drop constraint if exists notifications_type_check;
 alter table public.notifications add constraint notifications_type_check
-  check (type in ('appreciation', 'comment', 'repost', 'follow', 'badge', 'reply', 'mention'));
+  check (type in ('appreciation', 'comment', 'repost', 'follow', 'badge', 'reply', 'mention', 'system'));
+alter table public.notifications add column if not exists message text;
 
 -- ─── MUTES ───────────────────────────────────────────────────────────────────
 create table if not exists public.mutes (
