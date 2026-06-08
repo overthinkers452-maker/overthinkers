@@ -335,6 +335,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       AsyncStorage.setItem(KEYS.SESSIONS, JSON.stringify(next)).catch(() => {});
       return next;
     });
+    supabase.auth.signOut({ scope: "others" }).catch(() => {});
     return removed;
   }, []);
 

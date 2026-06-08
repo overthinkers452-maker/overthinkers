@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Session, User, AuthError } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { logSecurityEvent } from "@/lib/thoughtsService";
 
 export interface AuthProfile {
   id: string;
@@ -124,20 +125,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         following_count: 0,
         thoughts_count: 0,
       }, { onConflict: "id", ignoreDuplicates: false }).then(undefined, () => {});
+      logSecurityEvent(data.user.id, "signup").catch(() => {});
     }
 
     return { error };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (data?.user) {
+      logSecurityEvent(data.user.id, "login_success").catch(() => {});
+    } else if (error) {
+      const { data: { user: maybeUser } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+      if (maybeUser) logSecurityEvent(maybeUser.id, "login_fail").catch(() => {});
+    }
     return { error };
   }, []);
 
   const signOut = useCallback(async () => {
+    const uid = user?.id;
     await supabase.auth.signOut();
+    if (uid) logSecurityEvent(uid, "signout").catch(() => {});
     setProfile(null);
-  }, []);
+  }, [user]);
 
   const resetPassword = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email);
@@ -146,8 +156,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const changePassword = useCallback(async (newPassword: string) => {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (!error && user?.id) logSecurityEvent(user.id, "password_change").catch(() => {});
     return { error };
-  }, []);
+  }, [user]);
 
   const refreshProfile = useCallback(async () => {
     if (user) await fetchProfile(user.id);
