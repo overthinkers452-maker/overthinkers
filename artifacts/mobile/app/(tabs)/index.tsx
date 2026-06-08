@@ -28,7 +28,7 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { thoughts, unreadCount, isBlocked, currentUser, feedLoading, refreshFeed, loadMoreFeed, hasMoreFeed, followingIds } = useApp();
+  const { thoughts, unreadCount, isBlocked, isMuted, currentUser, feedLoading, refreshFeed, loadMoreFeed, hasMoreFeed, followingIds } = useApp();
   const { blockedWords } = useSettings();
   const [activeFeed, setActiveFeed] = useState<FeedTypeNew>("For You");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -57,7 +57,7 @@ export default function HomeScreen() {
     if (activeCategory) {
       base = base.filter(t => t.category.toLowerCase() === activeCategory.toLowerCase());
     }
-    return applyFeedFilters(base, { blockedWords, isBlocked, currentUserId: currentUser.id });
+    return applyFeedFilters(base, { blockedWords, isBlocked, isMuted, currentUserId: currentUser.id });
   };
 
   const filteredThoughts = getFiltered();

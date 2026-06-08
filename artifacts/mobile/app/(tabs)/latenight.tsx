@@ -301,7 +301,7 @@ const nc = StyleSheet.create({
 
 export default function LateNightScreen() {
   const insets = useSafeAreaInsets();
-  const { thoughts, currentUser, toggleAppreciate, isBlocked, postNightThought } = useApp();
+  const { thoughts, currentUser, toggleAppreciate, isBlocked, isMuted, postNightThought } = useApp();
   const { user } = useAuth();
   const { blockedWords } = useSettings();
   const { tap, success } = useFeedback();
@@ -357,6 +357,9 @@ export default function LateNightScreen() {
             .single();
 
           if (!data) return;
+
+          // Skip thoughts from blocked or muted users
+          if (isBlocked(data.author_id) || isMuted(data.author_id)) return;
 
           const interactions = await svc.fetchUserInteractions(user.id, [row.id]);
           // Map manually since mapDbThought is not exported
@@ -422,9 +425,9 @@ export default function LateNightScreen() {
   const nightThoughts = useMemo(
     () => applyFeedFilters(
       allNightThoughts,
-      { blockedWords, isBlocked, currentUserId: currentUser.id }
+      { blockedWords, isBlocked, isMuted, currentUserId: currentUser.id }
     ),
-    [allNightThoughts, blockedWords, isBlocked, currentUser.id]
+    [allNightThoughts, blockedWords, isBlocked, isMuted, currentUser.id]
   );
 
   const myNightCount = useMemo(

@@ -46,22 +46,29 @@ export default function PublicProfileScreen() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [userThoughts, setUserThoughts] = useState<Thought[]>([]);
   const [loading, setLoading] = useState(true);
+  const [serverPrivateHidden, setServerPrivateHidden] = useState(false);
 
   const safeUserId = userId ?? "";
   const isOwnProfile = safeUserId === currentUser.id;
   const isFollowed = followedUsers.has(safeUserId);
   const isMutedUser = isMuted(safeUserId);
   const isBlockedUser = isBlocked(safeUserId);
-  const isPrivateAndHidden = !isOwnProfile && !isFollowed && (profile?.is_private ?? false);
+  // Prefer server-authoritative flag; fall back to local follow state to avoid flicker
+  const isPrivateAndHidden = serverPrivateHidden || (!isOwnProfile && !isFollowed && (profile?.is_private ?? false));
 
   useEffect(() => {
     if (!safeUserId) return;
     setLoading(true);
+    setServerPrivateHidden(false);
     Promise.all([
       svc.fetchProfileById(safeUserId, user?.id),
       svc.fetchProfileThoughts(safeUserId, user?.id),
     ]).then(([p, t]) => {
-      setProfile(p as ProfileData);
+      if (p) {
+        const { _isPrivateAndHidden, ...profileData } = p as any;
+        setProfile(profileData as ProfileData);
+        setServerPrivateHidden(!!_isPrivateAndHidden);
+      }
       setUserThoughts(t);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [safeUserId, user?.id]);
