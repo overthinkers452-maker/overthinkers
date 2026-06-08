@@ -36,7 +36,7 @@ export default function PublicProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { userId } = useLocalSearchParams<{ userId: string }>();
-  const { currentUser, followedUsers, toggleFollowUser, mutedUsers, muteUser, unmuteUser, isMuted } = useApp();
+  const { currentUser, followedUsers, toggleFollowUser, mutedUsers, muteUser, unmuteUser, isMuted, blockUser, unblockUser, isBlocked } = useApp();
   const modal = useModal();
   const { user } = useAuth();
   const { tap } = useFeedback();
@@ -51,13 +51,14 @@ export default function PublicProfileScreen() {
   const isOwnProfile = safeUserId === currentUser.id;
   const isFollowed = followedUsers.has(safeUserId);
   const isMutedUser = isMuted(safeUserId);
+  const isBlockedUser = isBlocked(safeUserId);
   const isPrivateAndHidden = !isOwnProfile && !isFollowed && (profile?.is_private ?? false);
 
   useEffect(() => {
     if (!safeUserId) return;
     setLoading(true);
     Promise.all([
-      svc.fetchProfileById(safeUserId),
+      svc.fetchProfileById(safeUserId, user?.id),
       svc.fetchProfileThoughts(safeUserId, user?.id),
     ]).then(([p, t]) => {
       setProfile(p as ProfileData);
@@ -114,12 +115,26 @@ export default function PublicProfileScreen() {
                   label: isMutedUser ? `Unmute @${profile?.username ?? ""}` : `Mute @${profile?.username ?? ""}`,
                   icon: isMutedUser ? "volume-2" : "volume-x",
                   onPress: () => {
-                    if (isMutedUser) {
-                      unmuteUser(safeUserId);
+                    if (isMutedUser) { unmuteUser(safeUserId); } else { muteUser(safeUserId, profile?.display_name ?? safeUserId, profile?.username); }
+                    tap();
+                  },
+                },
+                {
+                  label: isBlockedUser ? `Unblock @${profile?.username ?? ""}` : `Block @${profile?.username ?? ""}`,
+                  icon: isBlockedUser ? "user-check" : "slash",
+                  destructive: !isBlockedUser,
+                  onPress: () => {
+                    if (isBlockedUser) {
+                      unblockUser(safeUserId);
                       tap();
                     } else {
-                      muteUser(safeUserId, profile?.display_name ?? safeUserId, profile?.username);
-                      tap();
+                      modal.confirm({
+                        title: `Block ${profile?.display_name ?? "this user"}?`,
+                        message: "You won't see their thoughts in your feeds anymore. You can unblock them in Settings.",
+                        confirmText: "Block",
+                        destructive: true,
+                        onConfirm: () => { blockUser(safeUserId, profile?.display_name ?? safeUserId); tap(); },
+                      });
                     }
                   },
                 },

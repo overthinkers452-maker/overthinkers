@@ -261,7 +261,9 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
           <Animated.View style={{ transform: [{ scale: heartScale }] }}>
             <Feather name="heart" size={16} color={thought.hasAppreciated ? colors.appreciate : colors.mutedForeground} />
           </Animated.View>
-          <Text style={[s.actionCount, thought.hasAppreciated && { color: colors.appreciate }]}>{formatCount(thought.appreciations)}</Text>
+          {(!thought.authorHideAppreciations || isOwnThought) && (
+            <Text style={[s.actionCount, thought.hasAppreciated && { color: colors.appreciate }]}>{formatCount(thought.appreciations)}</Text>
+          )}
         </TouchableOpacity>
         {!hideDisagreements && (
           <TouchableOpacity onPress={onDisagree} style={s.actionBtn} activeOpacity={0.7}>
@@ -275,7 +277,9 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
         </TouchableOpacity>
         <TouchableOpacity onPress={onRepost} style={s.actionBtn} activeOpacity={0.7}>
           <Feather name="repeat" size={16} color={thought.hasReposted ? colors.primary : colors.mutedForeground} />
-          <Text style={[s.actionCount, thought.hasReposted && { color: colors.primary }]}>{formatCount(thought.reposts)}</Text>
+          {(!thought.authorHideReposts || isOwnThought) && (
+            <Text style={[s.actionCount, thought.hasReposted && { color: colors.primary }]}>{formatCount(thought.reposts)}</Text>
+          )}
         </TouchableOpacity>
         <TouchableOpacity onPress={onSave} style={s.actionBtn} activeOpacity={0.7}>
           <Animated.View style={{ transform: [{ scale: saveScale }] }}>

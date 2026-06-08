@@ -61,6 +61,8 @@ function mapDbThought(row: any, userId?: string, userInteractions?: {
     originalAuthorId: row.original_author_id ?? undefined,
     originalAuthorName: row.original_author?.display_name ?? undefined,
     originalPostingMode: row.original_author_id ? row.posting_mode : undefined,
+    authorHideAppreciations: row.profiles?.hide_appreciations ?? false,
+    authorHideReposts: row.profiles?.hide_reposts ?? false,
   };
 }
 
@@ -132,7 +134,7 @@ export async function fetchFeed(opts: {
 
   let query = supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
     .range(offset, offset + limit - 1);
 
   if (category) query = query.eq("category", category);
@@ -194,7 +196,7 @@ export async function createThought(params: {
     } : null,
     is_night_thought: params.isNightThought ?? false,
     quality_score: 0,
-  }).select("*, profiles!thoughts_author_id_fkey(display_name, username)").single();
+  }).select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)").single();
 
   if (error) throw error;
 
@@ -471,7 +473,7 @@ export async function fetchSavedThoughts(userId: string): Promise<Thought[]> {
 
   const { data } = await supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
     .in("id", ids);
 
   if (!data) return [];
@@ -569,7 +571,7 @@ export async function markAllNotificationsRead(userId: string) {
 export async function searchThoughts(query: string, userId?: string): Promise<Thought[]> {
   const { data } = await supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
     .textSearch("content", query, { type: "websearch" })
     .limit(30);
 
@@ -590,13 +592,26 @@ export async function searchProfiles(query: string) {
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
-export async function fetchProfileById(userId: string) {
+export async function fetchProfileById(userId: string, viewerUserId?: string) {
   const { data } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", userId)
     .single();
-  return data;
+
+  if (!data) return null;
+
+  if (data.is_private && viewerUserId && viewerUserId !== userId) {
+    const { data: follow } = await supabase
+      .from("follows")
+      .select("id")
+      .eq("follower_id", viewerUserId)
+      .eq("following_id", userId)
+      .maybeSingle();
+    return { ...data, _isPrivateAndHidden: !follow };
+  }
+
+  return { ...data, _isPrivateAndHidden: false };
 }
 
 export async function fetchProfileThoughts(userId: string, viewerUserId?: string): Promise<Thought[]> {
@@ -619,7 +634,7 @@ export async function fetchProfileThoughts(userId: string, viewerUserId?: string
 
   const { data } = await supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
     .eq("author_id", userId)
     .order("created_at", { ascending: false });
 
@@ -665,7 +680,7 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
 export async function fetchNightThoughts(userId?: string): Promise<Thought[]> {
   const { data } = await supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
     .eq("is_night_thought", true)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -792,7 +807,7 @@ export async function fetchHashtagFeed(
 
   const { data } = await supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
     .in("id", thoughtIds)
     .order("created_at", { ascending: false });
 

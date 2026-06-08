@@ -48,6 +48,8 @@ export interface Thought {
   originalAuthorName?: string;
   originalAuthorId?: string;
   originalPostingMode?: PostingMode;
+  authorHideAppreciations?: boolean;
+  authorHideReposts?: boolean;
 }
 
 export interface Comment {
