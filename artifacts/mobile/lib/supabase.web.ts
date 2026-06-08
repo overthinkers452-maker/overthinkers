@@ -5,10 +5,18 @@ import { Platform } from "react-native";
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
-// Metro resolves platform-specific files first:
-//   supabase.native.ts  → iOS and Android (no ws, uses native WebSocket)
-//   supabase.web.ts     → Expo web (browser + SSR, uses ws polyfill for Node.js 20)
-// This file is the generic fallback — kept clean so it never pulls in Node.js modules.
+// Node.js 20 (Expo web SSR) has no native WebSocket global. Supply the `ws`
+// package so Supabase Realtime can initialise without throwing.
+// In the browser, WebSocket is native — skip the require entirely.
+function getWsTransport() {
+  if (typeof WebSocket !== "undefined") return undefined;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require("ws");
+  } catch {
+    return undefined;
+  }
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -16,6 +24,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+  },
+  realtime: {
+    transport: getWsTransport(),
   },
 });
 

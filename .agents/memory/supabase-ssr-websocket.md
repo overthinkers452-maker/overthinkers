@@ -1,21 +1,17 @@
 ---
-name: Supabase SSR WebSocket crash
-description: Supabase createClient() throws "Node.js 20 detected without native WebSocket support" during Expo web SSR, crashing every page with a 500. Fix requires the `ws` package + conditional transport.
+name: Supabase SSR WebSocket crash + Android ws bundling
+description: Two related issues — Expo web SSR crashes on Node.js 20 without ws, but putting ws in a shared supabase.ts causes Android UnableToResolveError for "stream". Proper fix is platform-specific files.
 ---
 
-**Rule:** Any Expo web project using Supabase Realtime must provide a fallback WebSocket transport for Node.js 20 SSR, otherwise `createClient()` throws at module initialization time and the entire SSR render fails with a 500.
+**Rule:** Never put `require("ws")` in a shared `supabase.ts`. Use Metro platform-specific file resolution instead.
 
-**Why:** Node.js 20 has no native `WebSocket` global. Supabase's realtime client detects this and throws immediately. Expo web uses Node.js for server-side rendering (SSR lambda), so the throw happens before any React component even renders, producing a blank page.
+**Why:** Metro does *static* analysis of `require()` calls. A runtime guard like `typeof WebSocket !== "undefined"` does NOT prevent Metro from bundling `ws` into the Android/iOS bundle. `ws` depends on Node.js-only modules (`stream`, `net`, `tls`, `http`, etc.) which Metro cannot resolve on Android → `UnableToResolveError: stream`.
 
-**How to apply:**
-1. `pnpm --filter @workspace/mobile add ws`
-2. In `lib/supabase.ts`, add before `createClient`:
-   ```ts
-   function getWsTransport() {
-     if (typeof WebSocket !== "undefined") return undefined; // browser or RN — native WS
-     try { return require("ws"); } catch { return undefined; }
-   }
-   ```
-3. Pass `realtime: { transport: getWsTransport() }` to `createClient`.
+**Proper fix — platform-specific files:**
+- `lib/supabase.native.ts` → React Native (iOS + Android). No `ws`, no `getWsTransport`. Metro picks this automatically for `platform=android` and `platform=ios`.
+- `lib/supabase.web.ts` → Expo web (browser + SSR Node.js 20). Includes `getWsTransport()` which `require("ws")` only in SSR. Metro picks this for `platform=web`.
+- `lib/supabase.ts` → Clean fallback (no `ws`). Metro only uses this if no platform-specific file matches.
 
-The `typeof WebSocket !== "undefined"` guard ensures this only activates in the Node.js SSR context — browsers and React Native both have native WebSocket and skip the require entirely.
+**What NOT to do:** A single `supabase.ts` with `require("ws")` behind any runtime guard — Metro bundles `ws` regardless.
+
+**Env vars:** `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` — both are public (anon key is safe to expose). Set as `shared` env vars via `setEnvVars`, not secrets.

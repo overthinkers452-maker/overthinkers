@@ -1,0 +1,385 @@
+OVERTHINKERS — COMPLETE REBUILD, SUPABASE RECONNECTION & PRODUCTION AUDIT
+
+You are a Senior React Native, Expo Router, TypeScript, Supabase, PostgreSQL, Mobile Architecture, Realtime Systems, Security, and Performance Engineer.
+
+Project Name: Overthinkers
+
+The repository has been imported from GitHub into a fresh Replit workspace.
+
+IMPORTANT OBJECTIVE:
+
+Your first task is to fully understand the entire codebase before making any changes.
+
+This project was previously connected to Supabase, but because it has been imported into a new Replit environment, you must verify and restore the complete Supabase integration.
+
+Your mission is to transform this project into a fully functional, production-ready, realtime social platform.
+
+==================================================
+CRITICAL RULES
+
+1. Analyze the entire codebase before modifying anything.
+2. Do not remove existing features unless they are completely broken and replaced with a better implementation.
+3. Preserve existing UI design, branding, navigation structure, and user experience.
+4. Maintain Expo compatibility.
+5. Use TypeScript everywhere.
+6. Use Supabase as the only backend.
+7. Create scalable production architecture.
+8. Fix broken functionality.
+9. Replace mock data with real data.
+10. Verify every screen manually.
+11. Verify every API call.
+12. Verify every database query.
+13. Verify every realtime subscription.
+14. Generate reports before and after changes.
+15. Keep all modifications commit-safe.
+
+==================================================
+PHASE 0 — FULL PROJECT ANALYSIS
+
+Read and analyze:
+
+- Entire source code
+- Components
+- Hooks
+- Contexts
+- Services
+- Navigation
+- Database layer
+- Authentication layer
+- Supabase layer
+- Storage layer
+- Realtime layer
+- Environment variables
+- Build configuration
+- Expo configuration
+
+Generate:
+
+/docs/PROJECT_ANALYSIS.md
+
+Include:
+
+- Existing architecture
+- Existing features
+- Missing features
+- Broken features
+- Database status
+- Realtime status
+- Security status
+- Performance status
+- Production readiness score
+
+==================================================
+PHASE 1 — SUPABASE RECONNECTION
+
+Verify:
+
+- Supabase URL
+- Supabase Anon Key
+- Environment Variables
+- Supabase Client Initialization
+- Authentication Configuration
+- Storage Buckets
+- Realtime Configuration
+- Database Connection
+
+If anything is disconnected:
+
+Reconnect everything automatically.
+
+Verify:
+
+- Login works
+- Signup works
+- Email verification works
+- Password reset works
+- Sessions persist
+- User data loads correctly
+
+Generate:
+
+/docs/SUPABASE_CONNECTION_REPORT.md
+
+==================================================
+PHASE 2 — DATABASE AUDIT
+
+Inspect Supabase database.
+
+Verify existence and correctness of:
+
+users
+profiles
+thoughts
+comments
+likes
+bookmarks
+follows
+notifications
+reports
+
+For each table verify:
+
+- Schema
+- Constraints
+- Foreign Keys
+- Indexes
+- Triggers
+- RLS Policies
+
+Create missing tables if needed.
+
+Fix broken relationships.
+
+Optimize indexes.
+
+Generate SQL migration files.
+
+==================================================
+PHASE 3 — REALTIME AUDIT
+
+Check whether the app actually feels realtime.
+
+Verify:
+
+- Feed updates instantly
+- Likes update instantly
+- Comments update instantly
+- Replies update instantly
+- Notifications update instantly
+- Follower counts update instantly
+- Profile changes update instantly
+
+If any screen is not realtime:
+
+Implement Supabase Realtime subscriptions.
+
+Ensure proper cleanup of listeners.
+
+Generate:
+
+/docs/REALTIME_AUDIT.md
+
+==================================================
+PHASE 4 — FEATURE VERIFICATION
+
+Verify every existing feature.
+
+Check:
+
+Authentication
+Profiles
+Thought Feed
+Thought Creation
+Comments
+Likes
+Bookmarks
+Follows
+Notifications
+Search
+Sharing
+Settings
+Reporting
+Moderation
+
+For each feature classify:
+
+WORKING
+PARTIALLY WORKING
+BROKEN
+MISSING
+
+Generate:
+
+/docs/FEATURE_AUDIT.md
+
+==================================================
+PHASE 5 — IMPLEMENT MISSING FEATURES
+
+Compare current project against this target feature list:
+
+AUTHENTICATION
+
+- Signup
+- Login
+- Logout
+- Email Verification
+- Forgot Password
+- Reset Password
+- Session Persistence
+
+SOCIAL FEATURES
+
+- Create Thought
+- Edit Thought
+- Delete Thought
+- Public Thoughts
+- Anonymous Thoughts
+- Comments
+- Nested Replies
+- Likes
+- Bookmarks
+- Follow System
+
+PROFILE FEATURES
+
+- Edit Profile
+- Avatar Upload
+- Bio
+- Username
+- Website
+
+SEARCH
+
+- Search Users
+- Search Thoughts
+- Search Categories
+
+NOTIFICATIONS
+
+- Like Notification
+- Comment Notification
+- Reply Notification
+- Follow Notification
+- Notification Center
+- Unread Badge
+
+MODERATION
+
+- Report User
+- Report Thought
+- Report Comment
+- Block User
+- Mute User
+
+SHARING
+
+- Native Share
+- Deep Linking
+
+Implement any missing functionality.
+
+==================================================
+PHASE 6 — UX & MOBILE QUALITY
+
+Fix:
+
+- Keyboard overlap issues
+- Hidden inputs
+- Navigation bugs
+- Empty screens
+- Broken buttons
+- Layout overflow
+- Android issues
+- iOS issues
+
+Verify every screen manually.
+
+Use:
+
+- KeyboardAvoidingView
+- SafeAreaView
+- ScrollView
+- Proper Insets
+
+==================================================
+PHASE 7 — PERFORMANCE OPTIMIZATION
+
+Optimize:
+
+- FlatLists
+- Infinite Scroll
+- Pagination
+- Lazy Loading
+- Memoization
+- React Query
+- Image Loading
+- Re-rendering
+- Database Queries
+
+Measure:
+
+- Startup Time
+- Feed Performance
+- Memory Usage
+- Realtime Performance
+
+==================================================
+PHASE 8 — SECURITY AUDIT
+
+Verify:
+
+- RLS Policies
+- Unauthorized Access Prevention
+- Secure Storage
+- Session Security
+- API Security
+- Input Validation
+- Data Validation
+
+Fix all security issues.
+
+Generate:
+
+/docs/SECURITY_AUDIT.md
+
+==================================================
+PHASE 9 — PRODUCTION READINESS
+
+Ensure:
+
+- No mock data remains
+- No placeholder APIs remain
+- No dead code remains
+- No broken navigation remains
+- No TypeScript errors remain
+- No Supabase errors remain
+- No console errors remain
+
+Run full project validation.
+
+==================================================
+PHASE 10 — FINAL REPORT
+
+Generate:
+
+/docs/FINAL_PRODUCTION_REPORT.md
+
+Include:
+
+WORKING FEATURES
+
+FIXED FEATURES
+
+NEW FEATURES ADDED
+
+REALTIME FEATURES VERIFIED
+
+DATABASE STRUCTURE
+
+SUPABASE STATUS
+
+SECURITY STATUS
+
+PERFORMANCE STATUS
+
+REMAINING ISSUES
+
+PRODUCTION READINESS SCORE
+
+==================================================
+FINAL REQUIREMENT
+
+Do not stop after fixing one issue.
+
+Continue auditing and improving the entire application until:
+
+- Supabase is fully connected.
+- Realtime functionality is verified.
+- Every screen works correctly.
+- Every major feature works correctly.
+- Missing features are implemented.
+- The application feels like a modern production-grade social platform.
+
+Think like a senior engineer performing a complete acquisition-level technical audit and rebuild.
+
+Deliver a stable, scalable, realtime, production-ready version of Overthinkers.
