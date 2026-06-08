@@ -71,7 +71,7 @@ export default function ProfileScreen() {
     thoughts, currentUser, moodEmoji, setMoodEmoji, bannerColor, setBannerColor,
     fleetingThoughts, addFleetingThought, canChangeUsername, savedThoughts,
   } = useApp();
-  const { user, updateProfile: updateAuthProfile, refreshProfile } = useAuth();
+  const { user, profile: authProfile, updateProfile: updateAuthProfile, refreshProfile } = useAuth();
   const { tap, success } = useFeedback();
   const modal = useModal();
 
@@ -257,6 +257,12 @@ export default function ProfileScreen() {
                   </TouchableOpacity>
                 </View>
                 <Text style={[styles.handle, { color: colors.mutedForeground }]}>@{currentUser.username}</Text>
+                {(authProfile?.strike_count ?? 0) >= 3 && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, alignSelf: "flex-start", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: "#FEF3C7" }}>
+                    <Feather name="alert-triangle" size={11} color="#D97706" />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#D97706" }}>Limited</Text>
+                  </View>
+                )}
                 <Text style={[styles.bio, { color: colors.mutedForeground }]}>{currentUser.bio}</Text>
               </View>
             </View>

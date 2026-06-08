@@ -29,6 +29,7 @@ interface ProfileData {
   following_count: number;
   thoughts_count: number;
   is_private: boolean;
+  strike_count?: number;
 }
 
 export default function PublicProfileScreen() {
@@ -183,9 +184,17 @@ export default function PublicProfileScreen() {
                   {profile?.username && (
                     <Text style={[styles.handle, { color: colors.mutedForeground }]}>@{profile.username}</Text>
                   )}
-                  <View style={[styles.badgeChip, { backgroundColor: badge.color + "25" }]}>
-                    <Feather name="award" size={11} color={badge.color} />
-                    <Text style={[styles.badgeLabel, { color: badge.color }]}>{badge.label}</Text>
+                  <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                    <View style={[styles.badgeChip, { backgroundColor: badge.color + "25", marginTop: 0 }]}>
+                      <Feather name="award" size={11} color={badge.color} />
+                      <Text style={[styles.badgeLabel, { color: badge.color }]}>{badge.label}</Text>
+                    </View>
+                    {(profile?.strike_count ?? 0) >= 3 && (
+                      <View style={[styles.badgeChip, { backgroundColor: "#FEF3C7", marginTop: 0 }]}>
+                        <Feather name="alert-triangle" size={11} color="#D97706" />
+                        <Text style={[styles.badgeLabel, { color: "#D97706" }]}>Limited</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
                 {isOwnProfile ? (

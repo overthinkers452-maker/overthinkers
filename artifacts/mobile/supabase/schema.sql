@@ -608,6 +608,30 @@ begin
   end if;
   insert into public.user_strikes (user_id, reason, issued_by)
   values (p_user_id, p_reason, auth.uid());
+  insert into public.moderation_actions (moderator_id, target_type, target_id, action, note)
+  values (auth.uid(), 'user', p_user_id, 'warn', p_reason);
   update public.profiles set strike_count = strike_count + 1 where id = p_user_id;
 end;
 $$;
+
+-- ─── SECURITY: restrict privileged profile columns from self-update ───────────
+-- Override the broad update policy so users cannot flip is_admin or alter
+-- strike_count on their own row (only security-definer RPCs may change these).
+drop policy if exists "Users can update their own profile" on public.profiles;
+create policy "Users can update their own profile" on public.profiles
+  for update
+  using (auth.uid() = id)
+  with check (
+    auth.uid() = id
+    AND is_admin  = (SELECT p.is_admin  FROM public.profiles p WHERE p.id = auth.uid())
+    AND strike_count = (SELECT p.strike_count FROM public.profiles p WHERE p.id = auth.uid())
+  );
+
+-- ─── REPORTS: let admins read the full report queue ───────────────────────────
+drop policy if exists "Users can see their own reports" on public.reports;
+drop policy if exists "Admins can read all reports" on public.reports;
+create policy "Reports select" on public.reports
+  for select using (
+    auth.uid() = reporter_id
+    OR exists (select 1 from public.profiles where id = auth.uid() and is_admin = true)
+  );

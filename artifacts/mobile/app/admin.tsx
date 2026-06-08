@@ -18,12 +18,9 @@ export default function AdminScreen() {
   const { isAdmin, queue, loading, actionLoading, error, refresh, dismiss, remove, warn } = useAdmin();
 
   useEffect(() => {
-    if (!isAdmin) {
-      router.replace("/(tabs)");
-      return;
-    }
+    if (!isAdmin) return;
     refresh();
-  }, [isAdmin, refresh, router]);
+  }, [isAdmin, refresh]);
 
   const onWarn = useCallback((group: ReportGroup) => {
     if (!group.authorId) return;
@@ -115,7 +112,22 @@ export default function AdminScreen() {
     );
   }, [actionLoading, colors, dismiss, remove, onWarn, s]);
 
-  if (!isAdmin) return null;
+  if (!isAdmin) {
+    return (
+      <>
+        <Stack.Screen options={{
+          title: "Not Found",
+          headerStyle: { backgroundColor: colors.background } as any,
+          headerTintColor: colors.primary,
+        }} />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background }}>
+          <Feather name="lock" size={40} color={colors.mutedForeground} />
+          <Text style={{ marginTop: 16, fontSize: 16, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>Access Denied</Text>
+          <Text style={{ marginTop: 8, fontSize: 14, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Admin access required.</Text>
+        </View>
+      </>
+    );
+  }
 
   return (
     <>
