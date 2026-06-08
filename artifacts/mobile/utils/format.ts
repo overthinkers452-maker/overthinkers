@@ -75,11 +75,11 @@ export function parseHashtags(content: string): string[] {
   return [...new Set(tags)];
 }
 
-const MENTION_PARSE_RE = /@([a-zA-Z0-9_]{2,30})(?=[^a-zA-Z0-9_]|$)/g;
+const MENTION_PARSE_RE = /@([a-zA-Z0-9_]{3,20})(?=[^a-zA-Z0-9_]|$)/g;
 
 /**
- * Extracts unique lowercase @mention usernames (letters/digits/underscores, 2–30 chars)
- * from a content string, without the leading `@`.
+ * Extracts unique lowercase @mention usernames (letters/digits/underscores, 3–20 chars,
+ * matching signup validation pattern) from a content string, without the leading `@`.
  */
 export function parseMentions(content: string): string[] {
   const names: string[] = [];

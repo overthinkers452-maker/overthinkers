@@ -203,9 +203,7 @@ export async function createThought(params: {
   await rpc("increment_profile_thoughts", { profile_id: params.authorId }).catch(() => {});
 
   indexThoughtHashtags(data.id, params.content).catch(() => {});
-  if (params.postingMode !== "Anonymous") {
-    notifyMentions(params.content, params.authorId, data.id).catch(() => {});
-  }
+  notifyMentions(params.content, params.authorId, data.id).catch(() => {});
 
   return mapDbThought(data, params.authorId);
 }
@@ -451,9 +449,7 @@ export async function createComment(params: {
     } as any).catch(() => {});
   }
 
-  if (params.postingMode !== "Anonymous") {
-    notifyMentions(params.content, params.authorId, params.thoughtId).catch(() => {});
-  }
+  notifyMentions(params.content, params.authorId, params.thoughtId).catch(() => {});
 
   return mapDbComment(data);
 }
@@ -761,7 +757,7 @@ export async function logSecurityEvent(
 
 // ─── Mentions ─────────────────────────────────────────────────────────────────
 
-const MENTION_RE = /@([a-zA-Z0-9_]{2,30})(?=[^a-zA-Z0-9_]|$)/g;
+const MENTION_RE = /@([a-zA-Z0-9_]{3,20})(?=[^a-zA-Z0-9_]|$)/g;
 
 function extractMentions(content: string): string[] {
   const names: string[] = [];
@@ -802,7 +798,7 @@ export async function notifyMentions(
 
 // ─── Hashtags ─────────────────────────────────────────────────────────────────
 
-const HASHTAG_RE = /#([a-zA-Z0-9_]+)/g;
+const HASHTAG_RE = /#([a-zA-Z0-9_]{2,30})(?=[^a-zA-Z0-9_]|$)/g;
 
 export function extractHashtags(content: string): string[] {
   const tags: string[] = [];

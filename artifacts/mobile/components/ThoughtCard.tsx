@@ -111,7 +111,7 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
 
   // ─── Tappable content: hashtags and @mentions ─────────────────────────────
   const renderContent = useCallback(() => {
-    const TOKEN_RE = /(#[a-zA-Z0-9_]{2,30}|@[a-zA-Z0-9_]{2,30})(?=[^a-zA-Z0-9_]|$)/g;
+    const TOKEN_RE = /(#[a-zA-Z0-9_]{2,30}|@[a-zA-Z0-9_]{3,20})(?=[^a-zA-Z0-9_]|$)/g;
     const segments: React.ReactNode[] = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
