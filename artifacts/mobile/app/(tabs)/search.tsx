@@ -12,6 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { ThoughtCard } from "@/components/ThoughtCard";
 import { formatCount } from "@/utils/format";
 import * as svc from "@/lib/thoughtsService";
+import type { TrendingMention } from "@/lib/thoughtsService";
 
 const TRENDING = ["consciousness", "AI relationships", "free will", "loneliness", "identity", "productivity"];
 const CATEGORIES = ["Philosophy", "Psychology", "Tech", "Society", "Culture", "Science", "Health", "Politics", "Relationships", "Creativity"];
@@ -34,6 +35,13 @@ interface HashtagResult {
   usage_count: number;
 }
 
+const AVATAR_COLORS = ["#C8D8FF", "#C8F5D8", "#E8C8FF", "#FFE8C8", "#C8FFEE", "#FFD8E8"];
+function avatarColor(username: string) {
+  let h = 0;
+  for (let i = 0; i < username.length; i++) h = (h * 31 + username.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
 export default function SearchTabScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -48,7 +56,16 @@ export default function SearchTabScreen() {
   const [peopleResults, setPeopleResults] = useState<PersonResult[]>([]);
   const [hashtagResults, setHashtagResults] = useState<HashtagResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [trendingMentions, setTrendingMentions] = useState<TrendingMention[]>([]);
+  const [mentionsLoading, setMentionsLoading] = useState(true);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    svc.fetchTrendingMentions(5)
+      .then(setTrendingMentions)
+      .catch(() => {})
+      .finally(() => setMentionsLoading(false));
+  }, []);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : 56 + insets.bottom;
@@ -112,7 +129,50 @@ export default function SearchTabScreen() {
 
       {!hasQuery ? (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: bottomPad }}>
-          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>TRENDING SEARCHES</Text>
+          {/* Trending Mentions */}
+          <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
+            <Feather name="at-sign" size={13} color={colors.primary} />
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground, paddingTop: 0, paddingBottom: 0 }]}>
+              TRENDING MENTIONS · LAST 24H
+            </Text>
+          </View>
+          {mentionsLoading ? (
+            <ActivityIndicator size={18} color={colors.mutedForeground} style={{ marginVertical: 18 }} />
+          ) : trendingMentions.length === 0 ? (
+            <Text style={[styles.mentionEmpty, { color: colors.mutedForeground }]}>No mention activity yet</Text>
+          ) : (
+            trendingMentions.map((m, idx) => (
+              <TouchableOpacity
+                key={m.userId}
+                onPress={() => router.push(`/user/${m.userId}` as any)}
+                style={[styles.mentionRow, { borderBottomColor: colors.border }]}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.mentionRank, { color: colors.mutedForeground }]}>{idx + 1}</Text>
+                <View style={[styles.mentionAvatar, { backgroundColor: avatarColor(m.username) }]}>
+                  <Text style={styles.mentionInitial}>
+                    {(m.displayName[0] ?? m.username[0] ?? "?").toUpperCase()}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.mentionName, { color: colors.foreground }]} numberOfLines={1}>
+                    {m.displayName}
+                  </Text>
+                  <Text style={[styles.mentionMeta, { color: colors.mutedForeground }]}>
+                    @{m.username} · {formatCount(m.followersCount)} followers
+                  </Text>
+                </View>
+                <View style={[styles.mentionBadge, { backgroundColor: colors.secondary }]}>
+                  <Text style={[styles.mentionBadgeText, { color: colors.primary }]}>
+                    {m.mentionCount} @
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+
+          {/* Trending Searches */}
+          <Text style={[styles.sectionLabel, { color: colors.mutedForeground, marginTop: 8 }]}>TRENDING SEARCHES</Text>
           {TRENDING.map(term => (
             <TouchableOpacity
               key={term}
@@ -305,5 +365,15 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     hashtagCount: { fontSize: 12, fontFamily: "Inter_400Regular" },
     empty: { paddingTop: 60, alignItems: "center", gap: 10 },
     emptyText: { fontSize: 14, fontFamily: "Inter_400Regular" },
+    sectionHeader: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1 },
+    mentionRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1 },
+    mentionRank: { width: 18, fontSize: 13, fontFamily: "Inter_600SemiBold", textAlign: "center" },
+    mentionAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+    mentionInitial: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#333" },
+    mentionName: { fontSize: 15, fontFamily: "Inter_600SemiBold", marginBottom: 2 },
+    mentionMeta: { fontSize: 12, fontFamily: "Inter_400Regular" },
+    mentionBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
+    mentionBadgeText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+    mentionEmpty: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", paddingVertical: 16 },
   });
 }

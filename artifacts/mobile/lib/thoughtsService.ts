@@ -973,6 +973,51 @@ export async function fetchHashtagFeed(
   return data.map((row: any) => mapDbThought(row, userId, interactions));
 }
 
+// ─── Trending Mentions ─────────────────────────────────────────────────────────
+
+export interface TrendingMention {
+  userId: string;
+  displayName: string;
+  username: string;
+  followersCount: number;
+  mentionCount: number;
+}
+
+export async function fetchTrendingMentions(limit = 5): Promise<TrendingMention[]> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const { data } = await supabase
+    .from("notifications")
+    .select("user_id, profiles!notifications_user_id_fkey(display_name, username, followers_count)")
+    .eq("type", "mention")
+    .gte("created_at", since);
+
+  if (!data || data.length === 0) return [];
+
+  // Aggregate mention counts per user in JS
+  const counts = new Map<string, { profile: any; count: number }>();
+  for (const row of data as any[]) {
+    if (!row.user_id || !row.profiles) continue;
+    const existing = counts.get(row.user_id);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      counts.set(row.user_id, { profile: row.profiles, count: 1 });
+    }
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, limit)
+    .map(([userId, { profile, count }]) => ({
+      userId,
+      displayName: profile.display_name ?? "Unknown",
+      username: profile.username ?? "",
+      followersCount: profile.followers_count ?? 0,
+      mentionCount: count,
+    }));
+}
+
 // ─── Storage: Profile Images ───────────────────────────────────────────────────
 
 export async function uploadProfileImage(
