@@ -234,3 +234,26 @@ export async function sendRepostNotification(opts: {
     data: { type: "repost", thoughtId: opts.thoughtId },
   });
 }
+
+export async function sendMentionNotification(opts: {
+  recipientId: string;
+  senderName: string;
+  thoughtContent: string;
+  thoughtId: string;
+}) {
+  if (Platform.OS === "web") return;
+  const token = await getRecipientToken(opts.recipientId);
+  if (!token) return;
+
+  const preview = opts.thoughtContent.length > 60
+    ? opts.thoughtContent.slice(0, 60) + "…"
+    : opts.thoughtContent;
+
+  await sendExpoPush({
+    to: token,
+    title: `${opts.senderName} mentioned you 💬`,
+    body: preview,
+    channelId: "default",
+    data: { type: "mention", thoughtId: opts.thoughtId },
+  });
+}

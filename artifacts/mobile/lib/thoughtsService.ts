@@ -204,7 +204,8 @@ export async function createThought(params: {
   await rpc("increment_profile_thoughts", { profile_id: params.authorId }).catch(() => {});
 
   indexThoughtHashtags(data.id, params.content).catch(() => {});
-  notifyMentions(params.content, params.authorId, data.id).catch(() => {});
+  const authorDisplayName = (data as any).profiles?.display_name as string | undefined;
+  notifyMentions(params.content, params.authorId, data.id, authorDisplayName).catch(() => {});
 
   return mapDbThought(data, params.authorId);
 }
@@ -450,7 +451,12 @@ export async function createComment(params: {
     } as any).catch(() => {});
   }
 
-  notifyMentions(params.content, params.authorId, params.thoughtId).catch(() => {});
+  const mentionName = params.postingMode === "Anonymous"
+    ? undefined
+    : params.postingMode === "Pseudonymous"
+    ? (params.alias || params.senderDisplayName)
+    : params.senderDisplayName;
+  notifyMentions(params.content, params.authorId, params.thoughtId, mentionName).catch(() => {});
 
   return mapDbComment(data);
 }
@@ -773,6 +779,7 @@ export async function notifyMentions(
   content: string,
   authorId: string,
   thoughtId: string,
+  authorName?: string,
 ): Promise<void> {
   const usernames = extractMentions(content).slice(0, 5);
   if (usernames.length === 0) return;
@@ -796,6 +803,18 @@ export async function notifyMentions(
   }));
 
   await supabase.from("notifications").insert(rows).then(undefined, () => {});
+
+  // Fire push notifications for each mentioned user
+  if (authorName) {
+    for (const recipientId of recipientIds) {
+      push.sendMentionNotification({
+        recipientId,
+        senderName: authorName,
+        thoughtContent: content,
+        thoughtId,
+      }).catch(() => {});
+    }
+  }
 }
 
 // ─── Hashtags ─────────────────────────────────────────────────────────────────
