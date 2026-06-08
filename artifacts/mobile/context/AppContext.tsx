@@ -336,15 +336,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!user) return;
-    svc.fetchFollowingIds(user.id).then(ids => {
+    // Load blocked + muted BEFORE followingIds so that when followingIds triggers
+    // the feed refresh effect, exclusion lists are already in state.
+    Promise.all([
+      svc.fetchFollowingIds(user.id),
+      svc.fetchBlockedUsers(user.id),
+      svc.fetchMutedUsers(user.id),
+    ]).then(([ids, blocked, muted]) => {
+      setBlockedUsers(blocked);
+      setMutedUsers(muted);
       setFollowingIds(ids);
       setFollowedUsers(new Set(ids));
-    }).catch(() => {});
-    svc.fetchBlockedUsers(user.id).then(users => {
-      setBlockedUsers(users);
-    }).catch(() => {});
-    svc.fetchMutedUsers(user.id).then(users => {
-      setMutedUsers(users);
     }).catch(() => {});
     refreshNotifications();
     refreshSaved();

@@ -140,7 +140,7 @@ export async function fetchFeed(opts: {
   if (category) query = query.eq("category", category);
 
   if (excludeIds.length > 0) {
-    query = query.not("author_id", "in", `(${excludeIds.join(",")})`);
+    query = query.not("author_id", "in", `("${excludeIds.join('","')}")`);
   }
 
   switch (feedType) {
@@ -691,7 +691,7 @@ export async function fetchNightThoughts(userId?: string, excludeIds: string[] =
     .limit(50);
 
   if (excludeIds.length > 0) {
-    query = query.not("author_id", "in", `(${excludeIds.join(",")})`);
+    query = query.not("author_id", "in", `("${excludeIds.join('","')}")`);
   }
 
   const { data } = await query;
