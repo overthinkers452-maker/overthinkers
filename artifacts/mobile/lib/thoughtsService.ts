@@ -135,7 +135,7 @@ export async function fetchFeed(opts: {
 
   let query = supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts, strike_count)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
     .range(offset, offset + limit - 1);
 
   if (category) query = query.eq("category", category);
@@ -485,7 +485,7 @@ export async function fetchSavedThoughts(userId: string): Promise<Thought[]> {
 
   const { data } = await supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts, strike_count)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
     .in("id", ids);
 
   if (!data) return [];
@@ -584,7 +584,7 @@ export async function markAllNotificationsRead(userId: string) {
 export async function searchThoughts(query: string, userId?: string, category?: string | null): Promise<Thought[]> {
   let q = supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts, strike_count)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
     .textSearch("content", query, { type: "websearch" })
     .limit(30);
 
@@ -655,7 +655,7 @@ export async function fetchProfileThoughts(userId: string, viewerUserId?: string
 
   const { data } = await supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts, strike_count)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
     .eq("author_id", userId)
     .order("created_at", { ascending: false });
 
@@ -701,7 +701,7 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
 export async function fetchNightThoughts(userId?: string, excludeIds: string[] = []): Promise<Thought[]> {
   let query = supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts, strike_count)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
     .eq("is_night_thought", true)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -964,7 +964,7 @@ export async function fetchHashtagFeed(
 
   const { data } = await supabase
     .from("thoughts")
-    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts, strike_count)")
+    .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
     .in("id", thoughtIds)
     .order("created_at", { ascending: false });
 
