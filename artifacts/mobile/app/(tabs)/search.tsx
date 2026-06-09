@@ -144,7 +144,7 @@ export default function SearchTabScreen() {
             trendingMentions.map((m, idx) => (
               <TouchableOpacity
                 key={m.userId}
-                onPress={() => router.push(`/user/${m.userId}` as any)}
+                onPress={() => router.push({ pathname: "/profile/[userId]", params: { userId: m.userId } })}
                 style={[styles.mentionRow, { borderBottomColor: colors.border }]}
                 activeOpacity={0.7}
               >

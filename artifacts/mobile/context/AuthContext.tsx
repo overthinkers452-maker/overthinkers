@@ -32,6 +32,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
+  resendVerification: (email: string) => Promise<{ error: AuthError | null }>;
   changePassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
   refreshProfile: () => Promise<void>;
   updateProfile: (updates: Partial<AuthProfile>) => Promise<{ error: Error | null }>;
@@ -154,6 +155,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   }, []);
 
+  const resendVerification = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resend({ type: "signup", email });
+    return { error };
+  }, []);
+
   const changePassword = useCallback(async (newPassword: string) => {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (!error && user?.id) logSecurityEvent(user.id, "password_change").catch(() => {});
@@ -218,7 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{
       session, user, profile, loading,
-      signUp, signIn, signOut, resetPassword, changePassword, refreshProfile, updateProfile, deleteAccount,
+      signUp, signIn, signOut, resetPassword, resendVerification, changePassword, refreshProfile, updateProfile, deleteAccount,
     }}>
       {children}
     </AuthContext.Provider>

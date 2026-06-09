@@ -43,8 +43,7 @@ export default function SignUpScreen() {
     if (error) {
       showToast(error.message || "Sign up failed. Please try again.", { type: "error" });
     } else {
-      showToast("Account created! Check your email to verify.", { type: "success" });
-      router.replace("/(tabs)");
+      router.replace({ pathname: "/auth/verify-email", params: { email: email.trim().toLowerCase() } });
     }
   };
 
