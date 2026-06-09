@@ -1,10 +1,12 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, Platform } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { View, Text, StyleSheet, FlatList, RefreshControl, Platform, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { Stack } from "expo-router";
 import { useColors } from "@/hooks/useColors";
+import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
+import { fetchSecurityLogs, type SecurityLogRow, type SecurityEventType } from "@/lib/thoughtsService";
 import { t } from "@/utils/i18n";
 
 function formatDate(iso: string): string {
@@ -17,12 +19,79 @@ function formatDate(iso: string): string {
   }
 }
 
+const EVENT_LABELS: Record<SecurityEventType, string> = {
+  login_success: "Login successful",
+  login_fail: "Failed login attempt",
+  password_change: "Password changed",
+  signout: "Signed out",
+  signup: "Account created",
+};
+
+type IconDef = { name: keyof typeof Feather.glyphMap; ok: boolean };
+const EVENT_ICON: Record<SecurityEventType, IconDef> = {
+  login_success: { name: "check", ok: true },
+  login_fail: { name: "alert-triangle", ok: false },
+  password_change: { name: "lock", ok: true },
+  signout: { name: "log-out", ok: true },
+  signup: { name: "user-plus", ok: true },
+};
+
+function LogRow({ item, colors }: { item: SecurityLogRow; colors: ReturnType<typeof useColors> }) {
+  const icon = EVENT_ICON[item.event_type] ?? { name: "activity" as const, ok: true };
+  const color = icon.ok ? colors.appreciate : colors.destructive;
+  const label = EVENT_LABELS[item.event_type] ?? item.event_type;
+  const device = (item.metadata?.device as string) ?? null;
+  const platform = (item.metadata?.platform as string) ?? null;
+
+  return (
+    <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[styles.iconWrap, { backgroundColor: color + "1A" }]}>
+        <Feather name={icon.name} size={16} color={color} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.status, { color: colors.foreground }]}>{label}</Text>
+        {(device || platform) ? (
+          <Text style={[styles.meta, { color: colors.mutedForeground }]}>
+            {[device, platform].filter(Boolean).join(" · ")}
+          </Text>
+        ) : null}
+        <Text style={[styles.meta, { color: colors.mutedForeground }]}>
+          {formatDate(item.created_at)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 export default function LoginHistoryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { appLanguage, loginHistory } = useSettings();
-  const styles = makeStyles(colors);
+  const { user } = useAuth();
+  const { appLanguage } = useSettings();
   const bottomPad = Platform.OS === "web" ? 32 : insets.bottom + 16;
+
+  const [logs, setLogs] = useState<SecurityLogRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async (isRefresh = false) => {
+    if (!user) return;
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchSecurityLogs(user.id, 50);
+      setLogs(data);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to load login history");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user]);
+
+  useEffect(() => { load(); }, [load]);
 
   return (
     <>
@@ -32,43 +101,49 @@ export default function LoginHistoryScreen() {
         headerTitleStyle: { fontFamily: "Inter_600SemiBold", color: colors.foreground } as any,
         headerTintColor: colors.primary,
       }} />
-      <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }}>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {loginHistory.map((e, i) => {
-            const ok = e.status === "success";
-            const color = ok ? colors.appreciate : colors.destructive;
-            return (
-              <View key={e.id} style={[styles.row, { borderBottomColor: colors.border, borderBottomWidth: i === loginHistory.length - 1 ? 0 : 1 }]}>
-                <View style={[styles.iconWrap, { backgroundColor: color + "1A" }]}>
-                  <Feather name={ok ? "check" : "alert-triangle"} size={16} color={color} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.status, { color: colors.foreground }]}>
-                    {ok ? t(appLanguage, "history.success") : t(appLanguage, "history.failed")}
-                  </Text>
-                  <Text style={[styles.meta, { color: colors.mutedForeground }]}>
-                    {e.device} · {e.platform}
-                  </Text>
-                  <Text style={[styles.meta, { color: colors.mutedForeground }]}>
-                    {e.location} · {formatDate(e.timeISO)}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
+
+      {loading ? (
+        <View style={[styles.center, { backgroundColor: colors.background }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      </ScrollView>
+      ) : (
+        <FlatList
+          data={logs}
+          keyExtractor={(item) => item.id}
+          style={{ backgroundColor: colors.background }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: bottomPad, gap: 8 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />
+          }
+          renderItem={({ item }) => <LogRow item={item} colors={colors} />}
+          ListHeaderComponent={
+            error ? (
+              <View style={[styles.errorBar, { backgroundColor: colors.destructive + "18", borderColor: colors.destructive + "30" }]}>
+                <Feather name="alert-circle" size={14} color={colors.destructive} />
+                <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Feather name="clock" size={20} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No login history found</Text>
+            </View>
+          }
+        />
+      )}
     </>
   );
 }
 
-function makeStyles(colors: ReturnType<typeof useColors>) {
-  return StyleSheet.create({
-    container: { flex: 1 },
-    card: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
-    row: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
-    iconWrap: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", marginTop: 2 },
-    status: { fontSize: 14.5, fontFamily: "Inter_600SemiBold" },
-    meta: { fontSize: 12.5, fontFamily: "Inter_400Regular", marginTop: 2 },
-  });
-}
+const styles = StyleSheet.create({
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  errorBar: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8 },
+  errorText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
+  row: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 14, paddingVertical: 13, borderRadius: 12, borderWidth: 1 },
+  iconWrap: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", marginTop: 2 },
+  status: { fontSize: 14.5, fontFamily: "Inter_600SemiBold" },
+  meta: { fontSize: 12.5, fontFamily: "Inter_400Regular", marginTop: 2 },
+  emptyCard: { borderRadius: 12, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 20 },
+  emptyText: { fontSize: 14, fontFamily: "Inter_400Regular" },
+});

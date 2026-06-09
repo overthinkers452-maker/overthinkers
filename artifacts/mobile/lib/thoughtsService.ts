@@ -874,6 +874,7 @@ export async function fetchReportQueue(): Promise<ReportGroup[]> {
   const { data, error } = await supabase
     .from("reports")
     .select("thought_id, comment_id, reason, created_at, thoughts(author_id, content), comments(author_id, content)")
+    .is("dismissed_at", null)
     .order("created_at", { ascending: false })
     .limit(200);
 
@@ -1054,6 +1055,25 @@ export async function fetchTrendingMentions(limit = 5): Promise<TrendingMention[
       followersCount: profile.followers_count ?? 0,
       mentionCount: count,
     }));
+}
+
+// ─── Security Logs: fetch for login history screen ───────────────────────────
+
+export interface SecurityLogRow {
+  id: string;
+  event_type: SecurityEventType;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export async function fetchSecurityLogs(userId: string, limit = 50): Promise<SecurityLogRow[]> {
+  const { data } = await supabase
+    .from("security_logs")
+    .select("id, event_type, metadata, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (data ?? []) as SecurityLogRow[];
 }
 
 // ─── Storage: Profile Images ───────────────────────────────────────────────────

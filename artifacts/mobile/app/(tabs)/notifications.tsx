@@ -18,14 +18,17 @@ const FILTER_ICONS: Record<Filter, keyof typeof Feather.glyphMap> = {
 const NOTIFICATION_ICON: Record<Notification["type"], keyof typeof Feather.glyphMap> = {
   appreciation: "heart", comment: "message-circle", repost: "repeat",
   follow: "user-plus", badge: "award", reply: "corner-down-right", mention: "at-sign",
+  system: "shield",
 };
 const NOTIFICATION_BG: Record<Notification["type"], string> = {
   appreciation: "#EDE9FE", comment: "#EDE9FE", repost: "#D1FAE5",
   follow: "#D1FAE5", badge: "#FEF3C7", reply: "#EDE9FE", mention: "#FEF9C3",
+  system: "#FEE2E2",
 };
 const NOTIFICATION_COLOR: Record<Notification["type"], string> = {
   appreciation: "#7C3AED", comment: "#7C3AED", repost: "#059669",
   follow: "#059669", badge: "#D97706", reply: "#7C3AED", mention: "#B45309",
+  system: "#DC2626",
 };
 
 function notifMatchesFilter(n: Notification, filter: Filter): boolean {
@@ -45,6 +48,7 @@ const ACTOR_LABELS: Record<Notification["type"], string> = {
   badge: "You earned the Regular badge. Your thoughts are gaining traction.",
   reply: "replied to your comment",
   mention: "mentioned you in a thought",
+  system: "Your content was reviewed by our moderation team. A community guideline strike has been issued.",
 };
 
 export default function NotificationsScreen() {

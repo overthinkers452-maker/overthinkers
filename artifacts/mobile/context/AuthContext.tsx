@@ -148,13 +148,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
+    const device = currentDevice();
+    const platform = currentPlatform();
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (data?.user) {
-      logSecurityEvent(data.user.id, "login_success").catch(() => {});
-      upsertUserSession(data.user.id, currentDevice(), currentPlatform()).catch(() => {});
+      logSecurityEvent(data.user.id, "login_success", { device, platform }).catch(() => {});
+      upsertUserSession(data.user.id, device, platform).catch(() => {});
     } else if (error) {
       const { data: { user: maybeUser } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
-      if (maybeUser) logSecurityEvent(maybeUser.id, "login_fail").catch(() => {});
+      if (maybeUser) logSecurityEvent(maybeUser.id, "login_fail", { device, platform }).catch(() => {});
     }
     return { error };
   }, []);
@@ -162,7 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     const uid = user?.id;
     await supabase.auth.signOut();
-    if (uid) logSecurityEvent(uid, "signout").catch(() => {});
+    if (uid) logSecurityEvent(uid, "signout", { device: currentDevice(), platform: currentPlatform() }).catch(() => {});
     setProfile(null);
   }, [user]);
 
