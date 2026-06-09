@@ -199,7 +199,7 @@ export async function createThought(params: {
     quality_score: 0,
   }).select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)").single();
 
-  if (error) throw error;
+  if (error) { console.error("CREATE THOUGHT ERROR", error); throw error; }
 
   await rpc("increment_profile_thoughts", { profile_id: params.authorId }).catch(() => {});
 
