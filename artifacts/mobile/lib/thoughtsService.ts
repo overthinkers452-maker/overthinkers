@@ -421,7 +421,7 @@ export async function createComment(params: {
     depth: params.depth ?? 0,
   }).select("*, profiles!comments_author_id_fkey(display_name, username)").single();
 
-  if (error) throw error;
+  if (error) { console.error("CREATE COMMENT ERROR", error); throw error; }
 
   await rpc("increment_thought_comments", { thought_id: params.thoughtId }).catch(() => {});
 
