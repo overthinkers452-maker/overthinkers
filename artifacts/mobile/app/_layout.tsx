@@ -1,10 +1,11 @@
 import {
-  Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, useFonts,
+  Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
 } from "@expo-google-fonts/inter";
+import * as Font from "expo-font";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -98,15 +99,49 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
-  });
+  const [fontsReady, setFontsReady] = useState(false);
 
   useEffect(() => {
-    if (fontsLoaded || fontError) SplashScreen.hideAsync();
-  }, [fontsLoaded, fontError]);
+    let cancelled = false;
 
-  if (!fontsLoaded && !fontError) return null;
+    // Safety valve: proceed with system fonts before fontfaceobserver's
+    // 6000ms hard timeout fires as an uncaught error on web.
+    const fallbackTimer = setTimeout(() => {
+      if (!cancelled) setFontsReady(true);
+    }, 4500);
+
+    Font.loadAsync({
+      Inter_400Regular,
+      Inter_500Medium,
+      Inter_600SemiBold,
+      Inter_700Bold,
+    })
+      .then(() => {
+        if (!cancelled) {
+          clearTimeout(fallbackTimer);
+          setFontsReady(true);
+        }
+      })
+      .catch(() => {
+        // Font load failed (network timeout, CDN block, etc.)
+        // Proceed immediately with system fonts instead of crashing.
+        if (!cancelled) {
+          clearTimeout(fallbackTimer);
+          setFontsReady(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(fallbackTimer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (fontsReady) SplashScreen.hideAsync();
+  }, [fontsReady]);
+
+  if (!fontsReady) return null;
 
   return (
     <SafeAreaProvider>
