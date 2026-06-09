@@ -43,7 +43,7 @@ const LANGUAGES: { code: string; label: string; roman?: boolean }[] = [
   { code: "te", label: "Telugu" },
 ];
 
-export function ThoughtCard({ thought, showReason = true }: Props) {
+export const ThoughtCard = React.memo(function ThoughtCard({ thought, showReason = true }: Props) {
   const colors = useColors();
   const router = useRouter();
   const { toggleAppreciate, toggleDisagree, toggleSave, toggleRepost, reportThought, deleteThought, currentUser, translateLang, setTranslateLang, blockUser } = useApp();
@@ -399,7 +399,7 @@ export function ThoughtCard({ thought, showReason = true }: Props) {
       </Modal>
     </Pressable>
   );
-}
+});
 
 function makeStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({

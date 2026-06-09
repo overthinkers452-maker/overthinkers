@@ -19,7 +19,7 @@ import { useApp, PostingMode, PollDuration } from "@/context/AppContext";
 import { ModeSelector } from "@/components/ModeSelector";
 import { useFeedback } from "@/hooks/useFeedback";
 import { useSettings } from "@/context/SettingsContext";
-import { modeLabel } from "@/utils/i18n";
+import { modeLabel, t } from "@/utils/i18n";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
 const CATEGORIES = [
@@ -109,7 +109,7 @@ export default function ComposeScreen() {
   return (
     <>
       <Stack.Screen options={{
-        title: "New Thought",
+        title: t(appLanguage, "compose.title"),
         headerBackTitle: "Cancel",
         headerStyle: { backgroundColor: colors.background } as any,
         headerTitleStyle: { fontFamily: "Inter_600SemiBold", color: colors.foreground } as any,
@@ -122,7 +122,7 @@ export default function ComposeScreen() {
             activeOpacity={0.8}
           >
             <Text style={[styles.postBtnText, { color: canPost ? colors.primaryForeground : colors.mutedForeground }]}>
-              Post
+              {t(appLanguage, "compose.post")}
             </Text>
           </TouchableOpacity>
         ),
@@ -161,7 +161,7 @@ export default function ComposeScreen() {
 
         <TextInput
           style={styles.input}
-          placeholder="What's on your mind?"
+          placeholder={t(appLanguage, "compose.placeholder")}
           placeholderTextColor={colors.mutedForeground}
           multiline
           maxLength={CHAR_LIMIT}

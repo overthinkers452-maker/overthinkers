@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import { Thought, Comment, Poll } from "@/context/AppContext";
 import { calculateQualityScore } from "@/utils/format";
 import * as push from "@/lib/pushNotifications";
+import { isNightOpenIST } from "../utils/nightWindow";
 
 // Wrap any Supabase thenable so native .catch() works
 async function rpc(name: string, params?: Record<string, unknown>) {
@@ -136,7 +137,8 @@ export async function fetchFeed(opts: {
   let query = supabase
     .from("thoughts")
     .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
-    .range(offset, offset + limit - 1);
+    .range(offset, offset + limit - 1)
+    .eq("is_night_thought", false);
 
   if (category) query = query.eq("category", category);
 
@@ -589,6 +591,7 @@ export async function searchThoughts(query: string, userId?: string, category?: 
     .limit(30);
 
   if (category) q = q.eq("category", category);
+  if (!isNightOpenIST()) q = q.eq("is_night_thought", false);
 
   const { data } = await q;
   if (!data) return [];
@@ -653,11 +656,13 @@ export async function fetchProfileThoughts(userId: string, viewerUserId?: string
     }
   }
 
-  const { data } = await supabase
+  let profileQuery = supabase
     .from("thoughts")
     .select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)")
     .eq("author_id", userId)
     .order("created_at", { ascending: false });
+  if (!isNightOpenIST()) profileQuery = profileQuery.eq("is_night_thought", false);
+  const { data } = await profileQuery;
 
   if (!data) return [];
   const ids = data.map((r: any) => r.id);

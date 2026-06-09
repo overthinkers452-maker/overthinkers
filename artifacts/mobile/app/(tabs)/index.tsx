@@ -18,9 +18,16 @@ import { useApp, Thought, FeedType } from "@/context/AppContext";
 import { useSettings } from "@/context/SettingsContext";
 import { ThoughtCard } from "@/components/ThoughtCard";
 import { applyFeedFilters } from "@/utils/feedFilter";
+import { t } from "@/utils/i18n";
 
 type FeedTypeNew = "For You" | "Trending" | "Latest" | "Following";
 const FEED_TYPES: FeedTypeNew[] = ["For You", "Trending", "Latest", "Following"];
+const FEED_TAB_KEYS: Record<FeedTypeNew, string> = {
+  "For You": "feed.tab.forYou",
+  "Trending": "feed.tab.trending",
+  "Latest": "feed.tab.latest",
+  "Following": "feed.tab.following",
+};
 
 const CATEGORIES = ["Philosophy", "Psychology", "Tech", "Society", "Culture", "Science", "Health", "Politics"];
 
@@ -29,7 +36,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { thoughts, unreadCount, isBlocked, isMuted, currentUser, feedLoading, refreshFeed, loadMoreFeed, hasMoreFeed, followingIds } = useApp();
-  const { blockedWords } = useSettings();
+  const { blockedWords, appLanguage } = useSettings();
   const [activeFeed, setActiveFeed] = useState<FeedTypeNew>("For You");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -76,6 +83,13 @@ export default function HomeScreen() {
     refreshFeed(activeFeed as any, activeCategory);
   }, [activeFeed, activeCategory]);
 
+  const renderThought = useCallback(
+    ({ item }: { item: Thought }) => (
+      <ThoughtCard thought={item} showReason={activeFeed === "For You" && !activeCategory} />
+    ),
+    [activeFeed, activeCategory]
+  );
+
   const styles = makeStyles(colors);
 
   return (
@@ -112,7 +126,7 @@ export default function HomeScreen() {
                 activeOpacity={0.7}
               >
                 <Text style={[styles.feedTabText, isActive && styles.feedTabTextActive]}>
-                  {feed}
+                  {t(appLanguage, FEED_TAB_KEYS[feed])}
                 </Text>
               </TouchableOpacity>
             );
@@ -159,7 +173,7 @@ export default function HomeScreen() {
       <FlatList
         data={filteredThoughts}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => <ThoughtCard thought={item} showReason={activeFeed === "For You" && !activeCategory} />}
+        renderItem={renderThought}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!!filteredThoughts.length}
         contentContainerStyle={{ paddingTop: 4, paddingBottom: bottomPad + 16 }}

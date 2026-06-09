@@ -14,6 +14,7 @@ import { useModal } from "@/context/ModalContext";
 import { applyFeedFilters } from "@/utils/feedFilter";
 import * as svc from "@/lib/thoughtsService";
 import { supabase } from "@/lib/supabase";
+import { isNightOpenIST, minutesUntilOpenIST, minutesUntilCloseIST } from "@/utils/nightWindow";
 
 // ─── Time helpers ─────────────────────────────────────────────────────────────
 
@@ -26,35 +27,6 @@ function tzAbbr() {
     const parts = new Date().toLocaleTimeString([], { timeZoneName: "short" }).split(" ");
     return parts[parts.length - 1];
   } catch { return ""; }
-}
-
-const OPEN_HOUR = 22;  // 10 PM
-const CLOSE_HOUR = 4;  // 4 AM
-
-/** The feed is open from 10 PM through 4 AM (local time). */
-function isNightOpen(d: Date = new Date()) {
-  const h = d.getHours();
-  return h >= OPEN_HOUR || h < CLOSE_HOUR;
-}
-
-/** Minutes remaining until the feed opens (only call when closed). */
-function minutesUntilOpen(d: Date = new Date()): number {
-  const h = d.getHours();
-  const m = d.getMinutes();
-  const nowMins = h * 60 + m;
-  const openMins = OPEN_HOUR * 60;
-  return nowMins < openMins ? openMins - nowMins : 0;
-}
-
-/** Minutes remaining until the feed closes (only call when open). */
-function minutesUntilClose(d: Date = new Date()): number {
-  const h = d.getHours();
-  const m = d.getMinutes();
-  const nowMins = h * 60 + m;
-  const closeMins = CLOSE_HOUR * 60;
-  return h >= OPEN_HOUR
-    ? (24 * 60 - nowMins) + closeMins
-    : Math.max(0, closeMins - nowMins);
 }
 
 function fmtCountdown(mins: number): string {
@@ -74,15 +46,15 @@ interface DynamicStatus {
 }
 
 function getDynamicStatus(d: Date = new Date()): DynamicStatus {
-  const open = isNightOpen(d);
+  const open = isNightOpenIST(d);
   if (open) {
-    const mins = minutesUntilClose(d);
+    const mins = minutesUntilCloseIST(d);
     if (mins <= 30) {
       return { label: `Closing in ${fmtCountdown(mins)}`, fabLabel: `Closing in ${fmtCountdown(mins)}`, isOpen: true, urgency: "soon" };
     }
     return { label: `Live now · closes in ${fmtCountdown(mins)}`, fabLabel: "Share now", isOpen: true, urgency: "normal" };
   } else {
-    const mins = minutesUntilOpen(d);
+    const mins = minutesUntilOpenIST(d);
     if (mins <= 30) {
       return { label: `Opening soon · in ${fmtCountdown(mins)}`, fabLabel: `Opening soon`, isOpen: false, urgency: "soon" };
     }
@@ -178,7 +150,7 @@ function ComposeModal({ visible, onClose, onSubmit }: {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={cm.overlay} behavior="padding">
+      <KeyboardAvoidingView style={cm.overlay} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <View style={cm.sheet}>
           <View style={cm.handle} />
           <View style={cm.headerRow}>
@@ -520,7 +492,7 @@ export default function LateNightScreen() {
       </View>
 
       <FlatList
-        data={nightThoughts}
+        data={status.isOpen ? nightThoughts : []}
         keyExtractor={item => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: bottomPad + 16 }}

@@ -170,6 +170,22 @@ const en: Dict = {
   "legal.terms.title": "Terms of Service",
   "legal.privacy.title": "Privacy Policy",
   "legal.lastUpdated": "Last updated",
+
+  // Feed tabs
+  "feed.tab.forYou": "For You",
+  "feed.tab.trending": "Trending",
+  "feed.tab.latest": "Latest",
+  "feed.tab.following": "Following",
+
+  // Compose screen
+  "compose.title": "New Thought",
+  "compose.post": "Post",
+  "compose.placeholder": "What's on your mind?",
+
+  // Thought & comment screen
+  "thought.title": "Thought",
+  "thought.noComments": "No comments yet. Be the first to respond.",
+  "thought.replyPlaceholder": "Reply thoughtfully...",
 };
 
 const hi: Dict = {
@@ -339,6 +355,22 @@ const hi: Dict = {
   "legal.terms.title": "सेवा की शर्तें",
   "legal.privacy.title": "गोपनीयता नीति",
   "legal.lastUpdated": "अंतिम अद्यतन",
+
+  // Feed tabs
+  "feed.tab.forYou": "आपके लिए",
+  "feed.tab.trending": "ट्रेंडिंग",
+  "feed.tab.latest": "नवीनतम",
+  "feed.tab.following": "अनुसरण किए",
+
+  // Compose screen
+  "compose.title": "नया विचार",
+  "compose.post": "पोस्ट करें",
+  "compose.placeholder": "आपके मन में क्या है?",
+
+  // Thought & comment screen
+  "thought.title": "विचार",
+  "thought.noComments": "अभी कोई टिप्पणी नहीं। पहले जवाब दें।",
+  "thought.replyPlaceholder": "सोच-समझकर जवाब दें...",
 };
 
 // Greek / Spanish / French keep their existing mode translations and fall back
