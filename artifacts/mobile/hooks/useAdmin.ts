@@ -6,6 +6,8 @@ import type { ReportGroup } from "@/lib/thoughtsService";
 export function useAdmin() {
   const { profile } = useAuth();
   const isAdmin = profile?.is_admin ?? false;
+  const isModerator = profile?.is_moderator ?? false;
+  const canAct = isAdmin || isModerator;
 
   const [queue, setQueue] = useState<ReportGroup[]>([]);
   const [loading, setLoading] = useState(false);
@@ -13,7 +15,7 @@ export function useAdmin() {
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!canAct) return;
     setLoading(true);
     setError(null);
     try {
@@ -24,10 +26,10 @@ export function useAdmin() {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin]);
+  }, [canAct]);
 
   const dismiss = useCallback(async (group: ReportGroup) => {
-    if (!isAdmin) return;
+    if (!canAct) return;
     const key = `${group.targetType}:${group.targetId}`;
     setActionLoading(key);
     setError(null);
@@ -39,8 +41,9 @@ export function useAdmin() {
     } finally {
       setActionLoading(null);
     }
-  }, [isAdmin]);
+  }, [canAct]);
 
+  // Remove is admin-only — moderators can dismiss/warn but not delete content
   const remove = useCallback(async (group: ReportGroup) => {
     if (!isAdmin) return;
     const key = `${group.targetType}:${group.targetId}`;
@@ -57,7 +60,7 @@ export function useAdmin() {
   }, [isAdmin]);
 
   const warn = useCallback(async (group: ReportGroup, reason: string) => {
-    if (!isAdmin || !group.authorId) return;
+    if (!canAct || !group.authorId) return;
     const key = `${group.targetType}:${group.targetId}`;
     setActionLoading(key);
     setError(null);
@@ -68,7 +71,7 @@ export function useAdmin() {
     } finally {
       setActionLoading(null);
     }
-  }, [isAdmin]);
+  }, [canAct]);
 
-  return { isAdmin, queue, loading, actionLoading, error, refresh, dismiss, remove, warn };
+  return { isAdmin, isModerator, canAct, queue, loading, actionLoading, error, refresh, dismiss, remove, warn };
 }

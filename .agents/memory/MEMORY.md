@@ -3,3 +3,4 @@
 - [Metro + pnpm transitive deps](metro-transitive-deps.md) — "Unable to resolve module X" at bundle time = a lib's undeclared transitive dep; `pnpm --filter add X` + restart expo. tsc won't catch it.
 - [Supabase SSR WebSocket crash](supabase-ssr-websocket.md) — Supabase createClient() throws at module init in Node.js 20 (no native WS); install `ws` and call getWsTransport() in realtime.transport option; browser/RN skip it via typeof WebSocket check.
 - [Push notifications + pnpm + Metro](push-notifications-setup.md) — expo-notifications must be in the mobile artifact's package.json (not just root); after version changes, clear .expo/metro-cache + node_modules/.cache before restart.
+- [Supabase upsert builder .catch()](supabase-upsert-catch.md) — PostgrestFilterBuilder (upsert/insert) has no .catch() method; wrap with try/catch instead or the call will silently swallow the error at runtime but fail tsc.

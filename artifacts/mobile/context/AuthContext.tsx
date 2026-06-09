@@ -1,7 +1,21 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { Platform } from "react-native";
 import { Session, User, AuthError } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import { logSecurityEvent } from "@/lib/thoughtsService";
+import { logSecurityEvent, upsertUserSession } from "@/lib/thoughtsService";
+
+function currentDevice(): string {
+  if (Platform.OS === "web") return "Web Browser";
+  if (Platform.OS === "ios") return "iPhone";
+  if (Platform.OS === "android") return "Android";
+  return Platform.OS ?? "Unknown";
+}
+function currentPlatform(): string {
+  if (Platform.OS === "web") return "Web";
+  if (Platform.OS === "ios") return `iOS ${Platform.Version}`;
+  if (Platform.OS === "android") return `Android ${Platform.Version}`;
+  return Platform.OS ?? "Unknown";
+}
 
 export interface AuthProfile {
   id: string;
@@ -20,6 +34,7 @@ export interface AuthProfile {
   hide_appreciations: boolean;
   hide_reposts: boolean;
   is_admin: boolean;
+  is_moderator: boolean;
   strike_count: number;
 }
 
@@ -136,6 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (data?.user) {
       logSecurityEvent(data.user.id, "login_success").catch(() => {});
+      upsertUserSession(data.user.id, currentDevice(), currentPlatform()).catch(() => {});
     } else if (error) {
       const { data: { user: maybeUser } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
       if (maybeUser) logSecurityEvent(maybeUser.id, "login_fail").catch(() => {});

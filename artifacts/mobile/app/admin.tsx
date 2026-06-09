@@ -14,16 +14,16 @@ import type { ReportGroup } from "@/lib/thoughtsService";
 export default function AdminScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { isAdmin, queue, loading, actionLoading, error, refresh, dismiss, remove, warn } = useAdmin();
+  const { isAdmin, isModerator, canAct, queue, loading, actionLoading, error, refresh, dismiss, remove, warn } = useAdmin();
 
   const [warnTarget, setWarnTarget] = useState<ReportGroup | null>(null);
   const [warnReason, setWarnReason] = useState("");
   const [warnBusy, setWarnBusy] = useState(false);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canAct) return;
     refresh();
-  }, [isAdmin, refresh]);
+  }, [canAct, refresh]);
 
   const onWarnPress = useCallback((group: ReportGroup) => {
     if (!group.authorId) return;
@@ -99,28 +99,30 @@ export default function AdminScreen() {
                 <Text style={[s.actionText, { color: "#F97316" }]}>Warn</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity
-              style={[s.actionBtn, { backgroundColor: colors.disagree + "12", borderColor: colors.disagree + "40" }]}
-              onPress={() => remove(item)}
-              activeOpacity={0.7}
-            >
-              <Feather name="trash-2" size={14} color={colors.disagree} />
-              <Text style={[s.actionText, { color: colors.disagree }]}>Remove</Text>
-            </TouchableOpacity>
+            {isAdmin && (
+              <TouchableOpacity
+                style={[s.actionBtn, { backgroundColor: colors.disagree + "12", borderColor: colors.disagree + "40" }]}
+                onPress={() => remove(item)}
+                activeOpacity={0.7}
+              >
+                <Feather name="trash-2" size={14} color={colors.disagree} />
+                <Text style={[s.actionText, { color: colors.disagree }]}>Remove</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
     );
   }, [actionLoading, colors, dismiss, remove, onWarnPress, s]);
 
-  if (!isAdmin) {
+  if (!canAct) {
     return <Redirect href="/+not-found" />;
   }
 
   return (
     <>
       <Stack.Screen options={{
-        title: "Admin Panel",
+        title: isAdmin ? "Admin Panel" : "Moderator Panel",
         headerStyle: { backgroundColor: colors.background } as any,
         headerTitleStyle: { fontFamily: "Inter_600SemiBold", color: colors.foreground } as any,
         headerTintColor: colors.primary,

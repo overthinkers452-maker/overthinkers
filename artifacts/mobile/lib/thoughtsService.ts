@@ -973,6 +973,44 @@ export async function fetchHashtagFeed(
   return data.map((row: any) => mapDbThought(row, userId, interactions));
 }
 
+// ─── User Sessions ────────────────────────────────────────────────────────────
+
+export interface UserSessionRow {
+  id: string;
+  device: string;
+  platform: string;
+  last_active: string;
+  created_at: string;
+}
+
+export async function upsertUserSession(userId: string, device: string, platform: string): Promise<void> {
+  try {
+    await supabase.from("user_sessions").upsert(
+      { user_id: userId, device, platform, last_active: new Date().toISOString() },
+      { onConflict: "user_id,device,platform" }
+    );
+  } catch {
+    // non-fatal — table may not exist yet until migration is run
+  }
+}
+
+export async function fetchUserSessions(userId: string): Promise<UserSessionRow[]> {
+  const { data } = await supabase
+    .from("user_sessions")
+    .select("id, device, platform, last_active, created_at")
+    .eq("user_id", userId)
+    .order("last_active", { ascending: false });
+  return (data ?? []) as UserSessionRow[];
+}
+
+export async function deleteOtherSessions(userId: string, device: string, platform: string): Promise<void> {
+  await supabase
+    .from("user_sessions")
+    .delete()
+    .eq("user_id", userId)
+    .neq("device", device);
+}
+
 // ─── Trending Mentions ─────────────────────────────────────────────────────────
 
 export interface TrendingMention {
