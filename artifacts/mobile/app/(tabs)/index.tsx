@@ -39,6 +39,7 @@ export default function HomeScreen() {
   const { blockedWords, appLanguage } = useSettings();
   const [activeFeed, setActiveFeed] = useState<FeedTypeNew>("For You");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeLanguage, setActiveLanguage] = useState<"en" | "hi" | "hinglish" | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [feedError, setFeedError] = useState<"offline" | "error" | null>(null);
 
@@ -64,6 +65,9 @@ export default function HomeScreen() {
     }
     if (activeCategory) {
       base = base.filter(t => t.category.toLowerCase() === activeCategory.toLowerCase());
+    }
+    if (activeLanguage) {
+      base = base.filter(t => (t.language ?? "en") === activeLanguage);
     }
     return applyFeedFilters(base, { blockedWords, isBlocked, isMuted, currentUserId: currentUser.id });
   };
@@ -173,6 +177,42 @@ export default function HomeScreen() {
               >
                 <Text style={[styles.categoryChipText, { color: isActive ? colors.primary : colors.foreground }]}>
                   {cat}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      <View style={styles.langWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.langContent}
+        >
+          {(
+            [
+              { value: "en" as const, label: "English" },
+              { value: "hi" as const, label: "हिंदी" },
+              { value: "hinglish" as const, label: "Hinglish" },
+            ] as const
+          ).map(lang => {
+            const isActive = activeLanguage === lang.value;
+            return (
+              <TouchableOpacity
+                key={lang.value}
+                onPress={() => setActiveLanguage(isActive ? null : lang.value)}
+                style={[
+                  styles.langChip,
+                  {
+                    borderColor: isActive ? colors.primary : colors.border,
+                    backgroundColor: isActive ? colors.primary + "15" : colors.card,
+                  },
+                ]}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.langChipText, { color: isActive ? colors.primary : colors.mutedForeground }]}>
+                  {lang.label}
                 </Text>
               </TouchableOpacity>
             );
@@ -338,6 +378,25 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     },
     categoryChipText: {
       fontSize: 13,
+      fontFamily: "Inter_500Medium",
+    },
+    langWrapper: {
+      paddingVertical: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    langContent: {
+      paddingHorizontal: 12,
+      gap: 6,
+    },
+    langChip: {
+      borderWidth: 1,
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+    },
+    langChipText: {
+      fontSize: 12,
       fontFamily: "Inter_500Medium",
     },
     fab: {

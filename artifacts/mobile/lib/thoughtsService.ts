@@ -186,6 +186,7 @@ export async function createThought(params: {
   pollData?: Poll;
   isNightThought?: boolean;
   mediaUrl?: string;
+  language?: "en" | "hi" | "hinglish";
 }) {
   const { data, error } = await supabase.from("thoughts").insert({
     author_id: params.authorId,
@@ -202,6 +203,7 @@ export async function createThought(params: {
     is_night_thought: params.isNightThought ?? false,
     quality_score: 0,
     media_url: params.mediaUrl ?? null,
+    language: params.language ?? "en",
   }).select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)").single();
 
   if (error) { console.error("CREATE THOUGHT ERROR", error); throw error; }

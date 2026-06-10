@@ -51,6 +51,7 @@ export default function ComposeScreen() {
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [language, setLanguage] = useState<"en" | "hi" | "hinglish">("en");
 
   const remaining = CHAR_LIMIT - content.length;
   const validPollOptions = pollOptions.filter(o => o.trim()).length;
@@ -115,6 +116,7 @@ export default function ComposeScreen() {
       type: pollData ? "poll" : "standard",
       poll: pollData,
       mediaUrl,
+      language,
     });
 
     recordThought();
@@ -273,6 +275,33 @@ export default function ComposeScreen() {
           </View>
         )}
 
+        <View style={[styles.langRow, { borderTopColor: colors.border }]}>
+          {(
+            [
+              { value: "en" as const, label: "English" },
+              { value: "hi" as const, label: "हिंदी" },
+              { value: "hinglish" as const, label: "Hinglish" },
+            ] as const
+          ).map(lang => (
+            <TouchableOpacity
+              key={lang.value}
+              onPress={() => setLanguage(lang.value)}
+              style={[
+                styles.langChip,
+                {
+                  borderColor: language === lang.value ? colors.primary : colors.border,
+                  backgroundColor: language === lang.value ? colors.primary + "15" : colors.secondary,
+                },
+              ]}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.langChipText, { color: language === lang.value ? colors.primary : colors.foreground }]}>
+                {lang.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <View style={styles.pollToggleRow}>
           <View style={styles.pollToggleLeft}>
             <Feather name="bar-chart-2" size={16} color={showPoll ? colors.primary : colors.mutedForeground} />
@@ -364,6 +393,9 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     categoriesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 12 },
     categoryChip: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 },
     categoryChipText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+    langRow: { flexDirection: "row", gap: 6, paddingVertical: 12, borderTopWidth: 1, flexWrap: "wrap" },
+    langChip: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6 },
+    langChipText: { fontSize: 13, fontFamily: "Inter_500Medium" },
     pollToggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14, borderTopWidth: 1, borderTopColor: colors.border },
     pollToggleLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
     pollToggleText: { fontSize: 15, fontFamily: "Inter_500Medium" },

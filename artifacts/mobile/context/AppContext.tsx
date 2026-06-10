@@ -53,6 +53,7 @@ export interface Thought {
   authorHideReposts?: boolean;
   authorStrikeCount?: number;
   mediaUrl?: string;
+  language?: "en" | "hi" | "hinglish";
 }
 
 export interface Comment {
@@ -546,6 +547,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       type: thought.type,
       pollData: thought.poll,
       mediaUrl: thought.mediaUrl,
+      language: thought.language,
     }).then(created => {
       setThoughts(prev => prev.map(t => t.id === optimisticId ? created : t));
     }).catch(() => {

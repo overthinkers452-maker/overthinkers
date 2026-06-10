@@ -131,7 +131,8 @@ function CommentNode({ comment, allComments, depth, styles, colors, appLanguage,
 }
 
 export default function ThoughtDetailScreen() {
-  const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
+  const { id: idRaw, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
+  const id = typeof idRaw === "string" ? idRaw : Array.isArray(idRaw) ? idRaw[0] : undefined;
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
