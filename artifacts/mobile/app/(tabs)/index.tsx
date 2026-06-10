@@ -348,7 +348,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
       borderRadius: 26,
       alignItems: "center",
       justifyContent: "center",
-      shadowColor: "#6366F1",
+      shadowColor: "#7C3AED",
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.35,
       shadowRadius: 8,

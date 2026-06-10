@@ -449,7 +449,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     modeBadge: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
     modeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
     menuBtn: { padding: 2 },
-    content: { fontSize: 14, lineHeight: 21, color: colors.foreground, fontFamily: "Inter_400Regular", marginBottom: 10 },
+    content: { fontSize: 15, lineHeight: 23, color: colors.foreground, fontFamily: "Inter_400Regular", marginBottom: 10 },
     translationBox: { borderWidth: 1, borderRadius: 8, padding: 10, marginBottom: 10 },
     translationLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 },
     translationText: { fontSize: 14, lineHeight: 20, fontFamily: "Inter_400Regular" },

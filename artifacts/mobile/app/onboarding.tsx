@@ -18,7 +18,7 @@ const SLIDES = [
     icon: "feather" as const,
     title: "Think out loud.",
     body: "Share your thoughts, opinions, and feelings — publicly, pseudonymously, or anonymously. Your voice, your rules.",
-    accent: "#6366F1",
+    accent: "#7C3AED",
   },
   {
     icon: "users" as const,
