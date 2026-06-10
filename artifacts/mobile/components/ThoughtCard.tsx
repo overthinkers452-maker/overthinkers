@@ -46,7 +46,7 @@ const LANGUAGES: { code: string; label: string; roman?: boolean }[] = [
 export const ThoughtCard = React.memo(function ThoughtCard({ thought, showReason = true }: Props) {
   const colors = useColors();
   const router = useRouter();
-  const { toggleAppreciate, toggleDisagree, toggleSave, toggleRepost, reportThought, deleteThought, currentUser, translateLang, setTranslateLang, blockUser } = useApp();
+  const { toggleAppreciate, toggleDisagree, toggleSave, toggleRepost, reportThought, deleteThought, currentUser, translateLang, setTranslateLang, blockUser, followedUsers, toggleFollowUser } = useApp();
   const { tap, select } = useFeedback();
   const { appLanguage, hideDisagreements } = useSettings();
   const modal = useModal();
@@ -181,6 +181,12 @@ export const ThoughtCard = React.memo(function ThoughtCard({ thought, showReason
     }
   }, [tap, thought.content]);
 
+  const isFollowing = followedUsers.has(thought.authorId);
+  const onFollow = useCallback(() => {
+    tap();
+    toggleFollowUser(thought.authorId);
+  }, [tap, toggleFollowUser, thought.authorId]);
+
   const onMenuPress = useCallback(() => {
     select();
     if (isOwnThought) {
@@ -268,7 +274,26 @@ export const ThoughtCard = React.memo(function ThoughtCard({ thought, showReason
             </Text>
           </View>
           <View style={s.authorInfo}>
-            <Text style={[s.authorName, !isAnon && { color: colors.primary }]}>{authorDisplay}</Text>
+            <View style={s.authorNameRow}>
+              <Text style={[s.authorName, !isAnon && { color: colors.primary }]}>{authorDisplay}</Text>
+              {!isOwnThought && !isAnon && (
+                <TouchableOpacity
+                  onPress={onFollow}
+                  style={[
+                    s.followPill,
+                    isFollowing
+                      ? { backgroundColor: colors.secondary, borderColor: colors.border }
+                      : { backgroundColor: colors.primary + "15", borderColor: colors.primary + "40" },
+                  ]}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.followText, { color: isFollowing ? colors.mutedForeground : colors.primary }]}>
+                    {isFollowing ? "Following" : "Follow"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <Text style={s.meta}>
               {thought.category} · {timeAgo(thought.createdAt)}
               {thought.isEdited && <Text style={s.editedMark}> · edited</Text>}
@@ -414,7 +439,10 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     avatar: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", flexShrink: 0 },
     avatarText: { fontSize: 15, fontFamily: "Inter_700Bold" },
     authorInfo: { flex: 1 },
+    authorNameRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
     authorName: { fontSize: 14, fontFamily: "Inter_700Bold", color: colors.foreground, marginBottom: 1 },
+    followPill: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 1 },
+    followText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
     meta: { fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular" },
     editedMark: { fontSize: 11, color: colors.mutedForeground, fontStyle: "italic" },
     headerRight: { flexDirection: "row", alignItems: "center", gap: 6 },

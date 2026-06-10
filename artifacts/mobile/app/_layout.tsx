@@ -10,6 +10,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as Notifications from "expo-notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ONBOARDING_KEY } from "@/app/onboarding";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -70,16 +72,33 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
 
   useEffect(() => {
-    if (loading) return;
+    AsyncStorage.getItem(ONBOARDING_KEY).then(val => {
+      setHasSeenOnboarding(!!val);
+      setOnboardingChecked(true);
+    }).catch(() => {
+      setHasSeenOnboarding(false);
+      setOnboardingChecked(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (loading || !onboardingChecked) return;
     const inAuthGroup = segments[0] === "auth";
-    if (!session && !inAuthGroup) {
-      router.replace("/auth/login");
-    } else if (session && inAuthGroup) {
+    const inOnboarding = segments[0] === "onboarding";
+    if (!session) {
+      if (!hasSeenOnboarding && !inOnboarding) {
+        router.replace("/onboarding");
+      } else if (hasSeenOnboarding && !inAuthGroup && !inOnboarding) {
+        router.replace("/auth/login");
+      }
+    } else if (session && (inAuthGroup || inOnboarding)) {
       router.replace("/(tabs)");
     }
-  }, [session, loading, segments]);
+  }, [session, loading, segments, onboardingChecked, hasSeenOnboarding]);
 
   return <>{children}</>;
 }
@@ -87,6 +106,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerBackTitle: "Back" }}>
+      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="auth" options={{ headerShown: false }} />
       <Stack.Screen name="compose" options={{ presentation: "modal", headerShown: true }} />

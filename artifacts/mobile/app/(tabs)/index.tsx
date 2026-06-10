@@ -40,6 +40,7 @@ export default function HomeScreen() {
   const [activeFeed, setActiveFeed] = useState<FeedTypeNew>("For You");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [feedError, setFeedError] = useState<"offline" | "error" | null>(null);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : 56 + insets.bottom;
@@ -69,9 +70,21 @@ export default function HomeScreen() {
 
   const filteredThoughts = getFiltered();
 
+  const detectOffline = () => {
+    if (typeof navigator !== "undefined" && "onLine" in navigator) {
+      return !navigator.onLine;
+    }
+    return false;
+  };
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refreshFeed(activeFeed as any, activeCategory).catch(() => {});
+    setFeedError(null);
+    try {
+      await refreshFeed(activeFeed as any, activeCategory);
+    } catch {
+      setFeedError(detectOffline() ? "offline" : "error");
+    }
     setRefreshing(false);
   }, [refreshFeed, activeFeed, activeCategory]);
 
@@ -80,7 +93,10 @@ export default function HomeScreen() {
   }, [loadMoreFeed, activeFeed, activeCategory]);
 
   useEffect(() => {
-    refreshFeed(activeFeed as any, activeCategory);
+    setFeedError(null);
+    refreshFeed(activeFeed as any, activeCategory).catch(() => {
+      setFeedError(detectOffline() ? "offline" : "error");
+    });
   }, [activeFeed, activeCategory]);
 
   const renderThought = useCallback(
@@ -164,7 +180,26 @@ export default function HomeScreen() {
         </ScrollView>
       </View>
 
-      {feedLoading && !refreshing && (
+      {feedError && (
+        <View style={[styles.errorBanner, {
+          backgroundColor: feedError === "offline" ? "#FEF3C7" : "#FEE2E2",
+          borderColor: feedError === "offline" ? "#FCD34D" : "#FECACA",
+        }]}>
+          <Feather
+            name={feedError === "offline" ? "wifi-off" : "alert-circle"}
+            size={15}
+            color={feedError === "offline" ? "#D97706" : "#DC2626"}
+          />
+          <Text style={[styles.errorBannerText, { color: feedError === "offline" ? "#92400E" : "#991B1B" }]}>
+            {feedError === "offline" ? "No internet connection." : "Couldn't load feed."}
+          </Text>
+          <TouchableOpacity onPress={onRefresh} style={styles.retryBtn} activeOpacity={0.7}>
+            <Text style={[styles.retryText, { color: feedError === "offline" ? "#D97706" : "#DC2626" }]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {feedLoading && !refreshing && !feedError && (
         <View style={{ alignItems: "center", paddingVertical: 12 }}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -318,6 +353,30 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
       shadowOpacity: 0.35,
       shadowRadius: 8,
       elevation: 8,
+    },
+    errorBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginHorizontal: 12,
+      marginTop: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 10,
+      borderWidth: 1,
+    },
+    errorBannerText: {
+      flex: 1,
+      fontSize: 13,
+      fontFamily: "Inter_500Medium",
+    },
+    retryBtn: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    retryText: {
+      fontSize: 13,
+      fontFamily: "Inter_600SemiBold",
     },
     emptyState: {
       paddingTop: 80,
