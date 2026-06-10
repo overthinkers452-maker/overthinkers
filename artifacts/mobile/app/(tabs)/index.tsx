@@ -29,7 +29,7 @@ const FEED_TAB_KEYS: Record<FeedTypeNew, string> = {
   "Following": "feed.tab.following",
 };
 
-const CATEGORIES = ["Philosophy", "Psychology", "Tech", "Society", "Culture", "Science", "Health", "Politics"];
+const CATEGORIES = ["Love", "Life", "Career", "Friendship", "Family", "Motivation", "Anxiety", "Funny", "Confessions", "Other"];
 
 export default function HomeScreen() {
   const colors = useColors();

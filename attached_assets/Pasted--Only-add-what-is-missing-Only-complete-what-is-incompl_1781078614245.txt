@@ -1,0 +1,284 @@
+---
+Only add what is missing.
+Only complete what is incomplete.
+Never rebuild what already works.
+
+DOCUMENT 1 — PRODUCT REQUIREMENTS DOCUMENT (PRD)
+
+Product Name
+
+Overthinkers
+
+One-Line Product Vision
+
+A social platform where people anonymously or publicly share thoughts, emotions, overthinking moments, relatable experiences, polls, and discussions in a safe and engaging community.
+
+
+---
+
+Problem Statement
+
+Most social media platforms reward attention-seeking content.
+
+People often have:
+
+random thoughts
+
+deep emotions
+
+overthinking moments
+
+life questions
+
+relationship confusion
+
+career stress
+
+mental clutter
+
+
+but no dedicated place to express them.
+
+Overthinkers solves this.
+
+
+---
+
+Target Users
+
+Primary Users
+
+Gen Z (16–30)
+
+Students
+
+Young professionals
+
+Introverts
+
+Overthinkers
+
+
+Secondary Users
+
+Writers
+
+Content creators
+
+Psychology enthusiasts
+
+Discussion lovers
+
+
+
+---
+
+User Roles
+
+Regular User
+
+Can:
+
+Create thoughts
+
+Like
+
+Comment
+
+Vote
+
+Follow users
+
+Chat
+
+Report content
+
+
+Verified Creator
+
+Can:
+
+Create premium content
+
+Gain badges
+
+Access creator analytics
+
+
+Moderator
+
+Can:
+
+Remove content
+
+Review reports
+
+Ban users
+
+
+Admin
+
+Full platform access.
+
+
+---
+
+Core Features
+
+Authentication
+
+Email login
+
+Google login
+
+Anonymous browsing
+
+Password reset
+
+
+Thought Feed
+
+Hindi thoughts
+
+English thoughts
+
+Hinglish thoughts
+
+
+Categories
+
+Love
+
+Life
+
+Career
+
+Friendship
+
+Family
+
+Motivation
+
+Anxiety
+
+Funny
+
+Confessions
+
+
+Interactions
+
+Like
+
+Comment
+
+Share
+
+Save
+
+Repost
+
+
+Polls
+
+Create polls
+
+Vote
+
+Results
+
+
+Profiles
+
+Avatar
+
+Bio
+
+Followers
+
+Following
+
+
+Notifications
+
+Likes
+
+Comments
+
+Mentions
+
+Followers
+
+
+Messaging
+
+1-to-1 chat
+
+
+Search
+
+Users
+
+Thoughts
+
+Categories
+
+
+
+---
+
+MVP Scope
+
+Version 1 includes:
+
+Auth
+
+Feed
+
+Thought posting
+
+Likes
+
+Comments
+
+Polls
+
+Profiles
+
+Notifications
+
+
+
+---
+
+Not Included In V1
+
+Voice rooms
+
+Live streaming
+
+Video feed
+
+AI therapist
+
+Group chat
+
+Premium subscriptions
+
+
+
+---
+
+Success Metrics
+
+DAU
+
+Retention
+
+Avg session time
+
+Thoughts per user
+
+Comments per post
+
+Poll participation

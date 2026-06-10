@@ -14,16 +14,16 @@ import * as svc from "@/lib/thoughtsService";
 const PAGE_SIZE = 20;
 
 const CATEGORY_ICONS: Record<string, string> = {
-  Philosophy: "🧠",
-  Psychology: "💭",
-  Tech: "⚡",
-  Society: "🌍",
-  Culture: "🎨",
-  Science: "🔬",
-  Health: "🌿",
-  Politics: "🏛️",
-  Relationships: "❤️",
-  Creativity: "✨",
+  Love: "❤️",
+  Life: "🌱",
+  Career: "💼",
+  Friendship: "🤝",
+  Family: "🏠",
+  Motivation: "🔥",
+  Anxiety: "😮‍💨",
+  Funny: "😂",
+  Confessions: "🤫",
+  Other: "💭",
 };
 
 type SortMode = "Latest" | "Trending";

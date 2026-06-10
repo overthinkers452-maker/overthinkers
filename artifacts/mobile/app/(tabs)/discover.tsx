@@ -15,7 +15,7 @@ import type { LeaderboardEntry } from "@/lib/thoughtsService";
 
 type DiscoverTab = "Explore" | "Leaderboard";
 const TRENDING_SEARCHES = ["consciousness", "AI relationships", "free will", "loneliness", "identity"];
-const CATEGORIES_GRID = ["Psychology","Society","Relationships","Tech","Creativity","Philosophy","Culture","Science","Politics","Health"];
+const CATEGORIES_GRID = ["Love","Life","Career","Friendship","Family","Motivation","Anxiety","Funny","Confessions","Other"];
 const BADGE_COLORS: Record<string, string> = { Elder: "#FBBF24", Insightful: "#C084FC", Thoughtful: "#818CF8", Newcomer: "#6EE7B7" };
 const AVATAR_BG_POOL = ["#C8F5D8","#C8D8FF","#E8C8FF","#FFE8C8","#C8FFEE","#FFD8E8"];
 function avatarBg(index: number) { return AVATAR_BG_POOL[index % AVATAR_BG_POOL.length]; }

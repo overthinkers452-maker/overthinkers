@@ -15,7 +15,7 @@ import * as svc from "@/lib/thoughtsService";
 import type { TrendingMention } from "@/lib/thoughtsService";
 
 const TRENDING = ["consciousness", "AI relationships", "free will", "loneliness", "identity", "productivity"];
-const CATEGORIES = ["Philosophy", "Psychology", "Tech", "Society", "Culture", "Science", "Health", "Politics", "Relationships", "Creativity"];
+const CATEGORIES = ["Love", "Life", "Career", "Friendship", "Family", "Motivation", "Anxiety", "Funny", "Confessions", "Other"];
 
 type ResultTab = "Thoughts" | "People" | "Hashtags";
 

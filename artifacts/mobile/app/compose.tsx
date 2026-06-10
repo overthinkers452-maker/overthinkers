@@ -26,8 +26,8 @@ import { useRateLimitStore } from "@/stores/rateLimitStore";
 import { capture } from "@/lib/analytics";
 
 const CATEGORIES = [
-  "Philosophy", "Technology", "Culture", "Psychology",
-  "Mental Health", "Politics", "Science", "Education", "Economics", "Other",
+  "Love", "Life", "Career", "Friendship", "Family",
+  "Motivation", "Anxiety", "Funny", "Confessions", "Other",
 ];
 
 const CHAR_LIMIT = 500;
@@ -43,7 +43,7 @@ export default function ComposeScreen() {
 
   const [content, setContent] = useState("");
   const [mode, setMode] = useState<PostingMode>("Public");
-  const [category, setCategory] = useState("Philosophy");
+  const [category, setCategory] = useState("Love");
   const [showPoll, setShowPoll] = useState(false);
   const [pollOptions, setPollOptions] = useState(["", ""]);
   const [pollDuration, setPollDuration] = useState<PollDuration>("24h");
