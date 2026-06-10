@@ -1032,6 +1032,7 @@ export interface ChatMessage {
 }
 
 export async function createOrGetConversation(myId: string, otherUserId: string): Promise<string> {
+  // Fast path: check for an existing shared conversation via SELECT (existing RLS is fine here)
   const { data: myParts } = await supabase
     .from("conversation_participants")
     .select("conversation_id")
@@ -1049,19 +1050,12 @@ export async function createOrGetConversation(myId: string, otherUserId: string)
     if (shared && shared.length > 0) return shared[0].conversation_id;
   }
 
-  const { data: conv, error } = await supabase
-    .from("conversations")
-    .insert({})
-    .select("id")
-    .single();
-  if (error || !conv) throw new Error(error?.message ?? "Failed to create conversation");
-
-  await supabase.from("conversation_participants").insert([
-    { conversation_id: conv.id, user_id: myId },
-    { conversation_id: conv.id, user_id: otherUserId },
-  ]);
-
-  return conv.id;
+  // Slow path: create via SECURITY DEFINER RPC which:
+  //   1. Inserts the conversation row (no INSERT policy existed before)
+  //   2. Inserts BOTH participant rows atomically (old policy blocked inserting the other user's row)
+  const { data: convId, error } = await supabase.rpc("create_conversation", { other_user_id: otherUserId });
+  if (error || !convId) throw new Error(error?.message ?? "Failed to create conversation");
+  return convId as string;
 }
 
 export async function fetchConversations(userId: string): Promise<ConversationSummary[]> {
