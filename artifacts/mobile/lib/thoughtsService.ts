@@ -65,6 +65,7 @@ function mapDbThought(row: any, userId?: string, userInteractions?: {
     authorHideAppreciations: row.profiles?.hide_appreciations ?? false,
     authorHideReposts: row.profiles?.hide_reposts ?? false,
     authorStrikeCount: row.profiles?.strike_count ?? 0,
+    mediaUrl: row.media_url ?? undefined,
   };
 }
 
@@ -184,6 +185,7 @@ export async function createThought(params: {
   type: "standard" | "poll";
   pollData?: Poll;
   isNightThought?: boolean;
+  mediaUrl?: string;
 }) {
   const { data, error } = await supabase.from("thoughts").insert({
     author_id: params.authorId,
@@ -199,6 +201,7 @@ export async function createThought(params: {
     } : null,
     is_night_thought: params.isNightThought ?? false,
     quality_score: 0,
+    media_url: params.mediaUrl ?? null,
   }).select("*, profiles!thoughts_author_id_fkey(display_name, username, hide_appreciations, hide_reposts)").single();
 
   if (error) { console.error("CREATE THOUGHT ERROR", error); throw error; }
@@ -1262,6 +1265,48 @@ export async function fetchSecurityLogs(userId: string, limit = 50): Promise<Sec
     .order("created_at", { ascending: false })
     .limit(limit);
   return (data ?? []) as SecurityLogRow[];
+}
+
+// ─── Storage: Thought Media ────────────────────────────────────────────────────
+
+export async function uploadThoughtMedia(
+  userId: string,
+  uri: string,
+): Promise<string | null> {
+  const ext = uri.split(".").pop()?.toLowerCase() ?? "jpg";
+  const mime = ext === "jpg" ? "image/jpeg" : `image/${ext}`;
+  const path = `${userId}/${Date.now()}.${ext}`;
+
+  const response = await fetch(uri);
+  const blob = await response.blob();
+
+  const { error } = await supabase.storage
+    .from("thought-media")
+    .upload(path, blob, { contentType: mime, upsert: true });
+
+  if (error) return null;
+
+  const { data } = supabase.storage.from("thought-media").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+// ─── Realtime: Comments ────────────────────────────────────────────────────────
+
+export function subscribeToComments(
+  thoughtId: string,
+  onInsert: () => void,
+): ReturnType<typeof supabase.channel> {
+  return supabase
+    .channel(`comments:${thoughtId}`)
+    .on("postgres_changes" as any, {
+      event: "INSERT",
+      schema: "public",
+      table: "comments",
+      filter: `thought_id=eq.${thoughtId}`,
+    }, () => {
+      onInsert();
+    })
+    .subscribe();
 }
 
 // ─── Storage: Profile Images ───────────────────────────────────────────────────

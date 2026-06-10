@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,12 @@ import {
   ScrollView,
   Switch,
   Platform,
-  Alert,
+  Image,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { Stack } from "expo-router";
+import { useRouter, Stack } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { useApp, PostingMode, PollDuration } from "@/context/AppContext";
 import { ModeSelector } from "@/components/ModeSelector";
@@ -21,6 +21,9 @@ import { useFeedback } from "@/hooks/useFeedback";
 import { useSettings } from "@/context/SettingsContext";
 import { modeLabel, t } from "@/utils/i18n";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { uploadThoughtMedia } from "@/lib/thoughtsService";
+import { useRateLimitStore } from "@/stores/rateLimitStore";
+import { capture } from "@/lib/analytics";
 
 const CATEGORIES = [
   "Philosophy", "Technology", "Culture", "Psychology",
@@ -36,6 +39,7 @@ export default function ComposeScreen() {
   const { addThought, currentUser } = useApp();
   const { success, select } = useFeedback();
   const { appLanguage } = useSettings();
+  const { canPostThought, recordThought, thoughtCooldownLeft } = useRateLimitStore();
 
   const [content, setContent] = useState("");
   const [mode, setMode] = useState<PostingMode>("Public");
@@ -45,11 +49,14 @@ export default function ComposeScreen() {
   const [pollDuration, setPollDuration] = useState<PollDuration>("24h");
   const [showCategories, setShowCategories] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
+  const [mediaUri, setMediaUri] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const remaining = CHAR_LIMIT - content.length;
   const validPollOptions = pollOptions.filter(o => o.trim()).length;
   const canPost = content.trim().length > 0 && content.length <= CHAR_LIMIT
-    && (!showPoll || validPollOptions >= 2);
+    && (!showPoll || validPollOptions >= 2)
+    && !uploading;
 
   const modeColor =
     mode === "Public" ? colors.publicMode
@@ -58,9 +65,33 @@ export default function ComposeScreen() {
 
   const styles = makeStyles(colors);
 
-  const onPost = () => {
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setMediaUri(result.assets[0].uri);
+    }
+  };
+
+  const onPost = async () => {
     if (!canPost) return;
+    if (!canPostThought()) {
+      const secs = Math.ceil(thoughtCooldownLeft() / 1000);
+      return;
+    }
     success();
+
+    let mediaUrl: string | undefined;
+    if (mediaUri) {
+      setUploading(true);
+      mediaUrl = await uploadThoughtMedia(currentUser.id, mediaUri) ?? undefined;
+      setUploading(false);
+    }
 
     const pollData = showPoll && pollOptions.filter(o => o.trim()).length >= 2
       ? {
@@ -83,8 +114,11 @@ export default function ComposeScreen() {
       category,
       type: pollData ? "poll" : "standard",
       poll: pollData,
+      mediaUrl,
     });
 
+    recordThought();
+    capture("thought_posted", { mode, category, hasPoll: !!pollData, hasMedia: !!mediaUrl });
     router.back();
   };
 
@@ -184,7 +218,27 @@ export default function ComposeScreen() {
               }
             ]} />
           </View>
+          <TouchableOpacity
+            onPress={pickImage}
+            style={[styles.attachBtn, { borderColor: mediaUri ? colors.primary : colors.border, backgroundColor: mediaUri ? colors.primary + "15" : colors.secondary }]}
+            activeOpacity={0.7}
+          >
+            <Feather name="image" size={15} color={mediaUri ? colors.primary : colors.mutedForeground} />
+          </TouchableOpacity>
         </View>
+
+        {mediaUri && (
+          <View style={styles.mediaPreview}>
+            <Image source={{ uri: mediaUri }} style={styles.mediaThumb} resizeMode="cover" />
+            <TouchableOpacity
+              onPress={() => setMediaUri(null)}
+              style={[styles.removeMedia, { backgroundColor: colors.background }]}
+              activeOpacity={0.8}
+            >
+              <Feather name="x" size={14} color={colors.foreground} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         <TouchableOpacity
           style={[styles.categoryBtn, { borderColor: colors.border, backgroundColor: colors.secondary }]}
@@ -325,5 +379,14 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     durationText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
     postBtn: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, marginRight: 4 },
     postBtnText: { fontSize: 14, fontFamily: "Inter_700Bold" },
+    attachBtn: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+    mediaPreview: { position: "relative", marginBottom: 12, alignSelf: "flex-start" },
+    mediaThumb: { width: 100, height: 100, borderRadius: 10 },
+    removeMedia: {
+      position: "absolute", top: -6, right: -6,
+      width: 20, height: 20, borderRadius: 10,
+      alignItems: "center", justifyContent: "center",
+      borderWidth: 1, borderColor: colors.border,
+    },
   });
 }

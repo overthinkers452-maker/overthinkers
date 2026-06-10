@@ -1,8 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { Session, User, AuthError } from "@supabase/supabase-js";
+import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
 import { supabase } from "@/lib/supabase";
 import { logSecurityEvent, upsertUserSession } from "@/lib/thoughtsService";
+import { capture, identify, analyticsReset } from "@/lib/analytics";
+
+WebBrowser.maybeCompleteAuthSession();
 
 function currentDevice(): string {
   if (Platform.OS === "web") return "Web Browser";
@@ -48,6 +53,10 @@ interface AuthContextType {
   bannedError: string | null;
   signUp: (email: string, password: string, username: string) => Promise<{ error: AuthError | Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signInWithOtp: (email: string) => Promise<{ error: AuthError | null }>;
+  verifyOtp: (email: string, token: string) => Promise<{ error: AuthError | null }>;
+  signInWithGoogle: () => Promise<{ error: AuthError | null }>;
+  signInAnonymously: () => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   resendVerification: (email: string) => Promise<{ error: AuthError | null }>;
@@ -94,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setBannedError(null);
       setProfile(data);
+      identify(userId, { username: data.username, badge: data.badge });
     }
   }, []);
 
@@ -167,9 +177,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (data?.user) {
       logSecurityEvent(data.user.id, "login_success", { device, platform }).catch(() => {});
       upsertUserSession(data.user.id, device, platform).catch(() => {});
+      capture("sign_in", { method: "password" });
     } else if (error) {
       const { data: { user: maybeUser } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
       if (maybeUser) logSecurityEvent(maybeUser.id, "login_fail", { device, platform }).catch(() => {});
+    }
+    return { error };
+  }, []);
+
+  const signInWithOtp = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.signInWithOtp({ email });
+    return { error };
+  }, []);
+
+  const verifyOtp = useCallback(async (email: string, token: string) => {
+    const device = currentDevice();
+    const platform = currentPlatform();
+    const { data, error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
+    if (data?.user) {
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", data.user.id)
+        .maybeSingle();
+      if (!existing) {
+        const username = `user_${Math.random().toString(36).slice(2, 8)}`;
+        try {
+          await supabase.from("profiles").upsert({
+            id: data.user.id,
+            username,
+            display_name: username,
+            bio: "",
+            reputation: 0,
+            badge: "Newcomer",
+            followers_count: 0,
+            following_count: 0,
+            thoughts_count: 0,
+          }, { onConflict: "id", ignoreDuplicates: true });
+        } catch {}
+      }
+      logSecurityEvent(data.user.id, "login_success", { method: "otp", device, platform }).catch(() => {});
+      upsertUserSession(data.user.id, device, platform).catch(() => {});
+      capture("sign_in", { method: "otp" });
+    }
+    return { error };
+  }, []);
+
+  const signInWithGoogle = useCallback(async () => {
+    const redirectTo = Linking.createURL("/");
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+    if (error) return { error };
+    if (data.url) {
+      await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    }
+    capture("sign_in", { method: "google" });
+    return { error: null };
+  }, []);
+
+  const signInAnonymously = useCallback(async () => {
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (data?.user) {
+      const guestUsername = `guest_${Math.random().toString(36).slice(2, 8)}`;
+      try {
+        await supabase.from("profiles").upsert({
+          id: data.user.id,
+          username: guestUsername,
+          display_name: "Guest",
+          bio: "",
+          reputation: 0,
+          badge: "Newcomer",
+          followers_count: 0,
+          following_count: 0,
+          thoughts_count: 0,
+        }, { onConflict: "id", ignoreDuplicates: true });
+      } catch {}
+      logSecurityEvent(data.user.id, "signup", { method: "anonymous" }).catch(() => {});
+      capture("sign_in", { method: "anonymous" });
     }
     return { error };
   }, []);
@@ -178,6 +264,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const uid = user?.id;
     await supabase.auth.signOut();
     if (uid) logSecurityEvent(uid, "signout", { device: currentDevice(), platform: currentPlatform() }).catch(() => {});
+    analyticsReset();
     setProfile(null);
   }, [user]);
 
@@ -255,7 +342,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{
       session, user, profile, loading, bannedError,
-      signUp, signIn, signOut, resetPassword, resendVerification, changePassword, refreshProfile, updateProfile, deleteAccount,
+      signUp, signIn, signInWithOtp, verifyOtp, signInWithGoogle, signInAnonymously,
+      signOut, resetPassword, resendVerification, changePassword, refreshProfile, updateProfile, deleteAccount,
     }}>
       {children}
     </AuthContext.Provider>

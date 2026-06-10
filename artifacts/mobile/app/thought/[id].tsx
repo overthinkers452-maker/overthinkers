@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -20,6 +20,10 @@ import { useFeedback } from "@/hooks/useFeedback";
 import { useModal } from "@/context/ModalContext";
 import { useSettings, AppLanguage } from "@/context/SettingsContext";
 import { modeLabel } from "@/utils/i18n";
+import { subscribeToComments } from "@/lib/thoughtsService";
+import { supabase } from "@/lib/supabase";
+import { useRateLimitStore } from "@/stores/rateLimitStore";
+import { capture } from "@/lib/analytics";
 
 type Styles = ReturnType<typeof makeStyles>;
 type Colors = ReturnType<typeof useColors>;
@@ -135,6 +139,7 @@ export default function ThoughtDetailScreen() {
   const { tap } = useFeedback();
   const modal = useModal();
   const { appLanguage } = useSettings();
+  const { canPostComment, recordComment, commentCooldownLeft } = useRateLimitStore();
 
   const [replyText, setReplyText] = useState("");
   const [replyMode, setReplyMode] = useState<PostingMode>("Public");
@@ -147,9 +152,12 @@ export default function ThoughtDetailScreen() {
 
   const thought = thoughts.find(t => t.id === id);
 
-  // Load comments from Supabase on mount
-  React.useEffect(() => {
-    if (id) refreshComments(id);
+  // Load comments from Supabase on mount and subscribe to live inserts
+  useEffect(() => {
+    if (!id) return;
+    refreshComments(id);
+    const channel = subscribeToComments(id, () => refreshComments(id));
+    return () => { supabase.removeChannel(channel); };
   }, [id]);
   const allComments = (comments[id!] || []).filter(c => !c.hasReported);
   const threadComments = allComments.filter(c => !c.parentId);
@@ -169,7 +177,14 @@ export default function ThoughtDetailScreen() {
 
   const onSubmitComment = () => {
     if (!replyText.trim()) return;
+    if (!canPostComment()) {
+      const secs = Math.ceil(commentCooldownLeft() / 1000);
+      modal.alert({ title: "Slow down", message: `Please wait ${secs}s before commenting again.` });
+      return;
+    }
     tap();
+    recordComment();
+    capture("comment_posted");
 
     const parentComment = replyingToId ? (comments[id!] || []).find(c => c.id === replyingToId) : null;
     const depth = parentComment ? parentComment.depth + 1 : 0;

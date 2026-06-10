@@ -52,6 +52,7 @@ export interface Thought {
   authorHideAppreciations?: boolean;
   authorHideReposts?: boolean;
   authorStrikeCount?: number;
+  mediaUrl?: string;
 }
 
 export interface Comment {
@@ -544,6 +545,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       alias: thought.alias,
       type: thought.type,
       pollData: thought.poll,
+      mediaUrl: thought.mediaUrl,
     }).then(created => {
       setThoughts(prev => prev.map(t => t.id === optimisticId ? created : t));
     }).catch(() => {
