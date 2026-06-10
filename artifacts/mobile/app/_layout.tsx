@@ -94,6 +94,7 @@ function RootLayoutNav() {
       <Stack.Screen name="profile/[userId]" options={{ headerShown: true }} />
       <Stack.Screen name="search" options={{ headerShown: true, title: "Search" }} />
       <Stack.Screen name="settings" options={{ headerShown: true, title: "Settings" }} />
+      <Stack.Screen name="messages" options={{ headerShown: false }} />
     </Stack>
   );
 }

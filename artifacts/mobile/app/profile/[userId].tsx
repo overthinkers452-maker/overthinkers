@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Platform, Animated, ActivityIndicator, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, Stack, useRouter } from "expo-router";
@@ -42,6 +42,7 @@ export default function PublicProfileScreen() {
   const { user } = useAuth();
   const { tap } = useFeedback();
   const { scale, bounce } = useBounce();
+  const [dmLoading, setDmLoading] = useState(false);
   const bottomPad = Platform.OS === "web" ? 84 : 56 + insets.bottom;
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -52,6 +53,17 @@ export default function PublicProfileScreen() {
   const safeUserId = userId ?? "";
   const isOwnProfile = safeUserId === currentUser.id;
   const isFollowed = followedUsers.has(safeUserId);
+
+  const handleDm = useCallback(async () => {
+    if (!user?.id || dmLoading) return;
+    tap();
+    setDmLoading(true);
+    try {
+      const convId = await svc.createOrGetConversation(user.id, safeUserId);
+      router.push(`/messages/${convId}` as any);
+    } catch {}
+    setDmLoading(false);
+  }, [user?.id, safeUserId, dmLoading, router, tap]);
   const isMutedUser = isMuted(safeUserId);
   const isBlockedUser = isBlocked(safeUserId);
   // Prefer server-authoritative flag; fall back to local follow state to avoid flicker
@@ -197,28 +209,50 @@ export default function PublicProfileScreen() {
                   )}
                 </View>
                 {isOwnProfile ? (
-                  <TouchableOpacity
-                    onPress={() => { tap(); router.push("/(tabs)/profile"); }}
-                    style={[styles.followBtn, { backgroundColor: "transparent", borderColor: colors.border }]}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.followBtnText, { color: colors.foreground }]}>Edit Profile</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <Animated.View style={{ transform: [{ scale }] }}>
+                  <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
                     <TouchableOpacity
-                      onPress={() => { tap(); bounce(); toggleFollowUser(safeUserId); }}
-                      style={[styles.followBtn, {
-                        backgroundColor: isFollowed ? "transparent" : colors.primary,
-                        borderColor: isFollowed ? colors.border : colors.primary,
-                      }]}
+                      onPress={() => { tap(); router.push("/(tabs)/profile"); }}
+                      style={[styles.followBtn, { backgroundColor: "transparent", borderColor: colors.border }]}
                       activeOpacity={0.8}
                     >
-                      <Text style={[styles.followBtnText, { color: isFollowed ? colors.foreground : "#fff" }]}>
-                        {isFollowed ? "Following" : "Follow"}
-                      </Text>
+                      <Text style={[styles.followBtnText, { color: colors.foreground }]}>Edit Profile</Text>
                     </TouchableOpacity>
-                  </Animated.View>
+                    <TouchableOpacity
+                      onPress={() => { tap(); router.push("/messages" as any); }}
+                      style={[styles.msgBtn, { borderColor: colors.border }]}
+                      activeOpacity={0.8}
+                    >
+                      <Feather name="message-circle" size={18} color={colors.foreground} />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                    <Animated.View style={{ transform: [{ scale }] }}>
+                      <TouchableOpacity
+                        onPress={() => { tap(); bounce(); toggleFollowUser(safeUserId); }}
+                        style={[styles.followBtn, {
+                          backgroundColor: isFollowed ? "transparent" : colors.primary,
+                          borderColor: isFollowed ? colors.border : colors.primary,
+                        }]}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.followBtnText, { color: isFollowed ? colors.foreground : "#fff" }]}>
+                          {isFollowed ? "Following" : "Follow"}
+                        </Text>
+                      </TouchableOpacity>
+                    </Animated.View>
+                    <TouchableOpacity
+                      onPress={handleDm}
+                      style={[styles.msgBtn, { borderColor: colors.border }]}
+                      activeOpacity={0.8}
+                      disabled={dmLoading}
+                    >
+                      {dmLoading
+                        ? <ActivityIndicator size="small" color={colors.primary} />
+                        : <Feather name="message-circle" size={18} color={colors.foreground} />
+                      }
+                    </TouchableOpacity>
+                  </View>
                 )}
               </View>
 
@@ -287,6 +321,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     badgeLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
     followBtn: { paddingHorizontal: 20, paddingVertical: 9, borderRadius: 20, borderWidth: 1, marginTop: 4 },
     followBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+    msgBtn: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: "center", justifyContent: "center", marginTop: 4 },
     topCategory: { fontSize: 13, fontFamily: "Inter_400Regular" },
     statsRow: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 12, paddingVertical: 14, marginTop: 4 },
     stat: { flex: 1, alignItems: "center" },

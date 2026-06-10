@@ -979,6 +979,189 @@ export async function fetchHashtagFeed(
   return data.map((row: any) => mapDbThought(row, userId, interactions));
 }
 
+// ─── Ban / Unban ──────────────────────────────────────────────────────────────
+
+export async function banUser(userId: string, reason: string): Promise<void> {
+  const { error } = await supabase
+    .from("profiles")
+    .update({ is_banned: true, banned_reason: reason })
+    .eq("id", userId);
+  if (error) throw new Error(error.message);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    try {
+      await supabase.from("moderation_actions").insert({
+        moderator_id: user.id,
+        action: "ban",
+        target_user_id: userId,
+        reason,
+      });
+    } catch {}
+  }
+}
+
+export async function unbanUser(userId: string): Promise<void> {
+  const { error } = await supabase
+    .from("profiles")
+    .update({ is_banned: false, banned_reason: null })
+    .eq("id", userId);
+  if (error) throw new Error(error.message);
+}
+
+// ─── 1-to-1 Chat ──────────────────────────────────────────────────────────────
+
+export interface ConversationSummary {
+  id: string;
+  otherUserId: string;
+  otherUserName: string;
+  otherUserAvatar: string | null;
+  lastMessage: string;
+  lastMessageAt: string | null;
+  unreadCount: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
+}
+
+export async function createOrGetConversation(myId: string, otherUserId: string): Promise<string> {
+  const { data: myParts } = await supabase
+    .from("conversation_participants")
+    .select("conversation_id")
+    .eq("user_id", myId);
+
+  const myConvIds = (myParts ?? []).map((p: any) => p.conversation_id);
+
+  if (myConvIds.length > 0) {
+    const { data: shared } = await supabase
+      .from("conversation_participants")
+      .select("conversation_id")
+      .eq("user_id", otherUserId)
+      .in("conversation_id", myConvIds)
+      .limit(1);
+    if (shared && shared.length > 0) return shared[0].conversation_id;
+  }
+
+  const { data: conv, error } = await supabase
+    .from("conversations")
+    .insert({})
+    .select("id")
+    .single();
+  if (error || !conv) throw new Error(error?.message ?? "Failed to create conversation");
+
+  await supabase.from("conversation_participants").insert([
+    { conversation_id: conv.id, user_id: myId },
+    { conversation_id: conv.id, user_id: otherUserId },
+  ]);
+
+  return conv.id;
+}
+
+export async function fetchConversations(userId: string): Promise<ConversationSummary[]> {
+  const { data: parts } = await supabase
+    .from("conversation_participants")
+    .select("conversation_id, unread_count")
+    .eq("user_id", userId);
+  if (!parts || parts.length === 0) return [];
+
+  const convIds = parts.map((p: any) => p.conversation_id as string);
+  const unreadMap: Record<string, number> = Object.fromEntries(
+    parts.map((p: any) => [p.conversation_id, p.unread_count ?? 0])
+  );
+
+  const { data: others } = await supabase
+    .from("conversation_participants")
+    .select("conversation_id, user_id, profiles:user_id(id, display_name, avatar_url)")
+    .in("conversation_id", convIds)
+    .neq("user_id", userId);
+  if (!others) return [];
+
+  const lastMsgs: Record<string, { content: string; created_at: string }> = {};
+  await Promise.all(
+    convIds.map(async (cid) => {
+      const { data: msgs } = await supabase
+        .from("messages")
+        .select("content, created_at")
+        .eq("conversation_id", cid)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (msgs && msgs.length > 0) lastMsgs[cid] = msgs[0] as any;
+    })
+  );
+
+  return others.map((p: any) => ({
+    id: p.conversation_id,
+    otherUserId: p.user_id,
+    otherUserName: (p.profiles as any)?.display_name ?? "User",
+    otherUserAvatar: (p.profiles as any)?.avatar_url ?? null,
+    lastMessage: lastMsgs[p.conversation_id]?.content ?? "",
+    lastMessageAt: lastMsgs[p.conversation_id]?.created_at ?? null,
+    unreadCount: unreadMap[p.conversation_id] ?? 0,
+  }));
+}
+
+export async function fetchMessages(conversationId: string, limit = 60, offset = 0): Promise<ChatMessage[]> {
+  const { data } = await supabase
+    .from("messages")
+    .select("id, conversation_id, sender_id, content, created_at")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  return ((data ?? []) as any[]).reverse().map((m: any) => ({
+    id: m.id,
+    conversationId: m.conversation_id,
+    senderId: m.sender_id,
+    content: m.content,
+    createdAt: m.created_at,
+  }));
+}
+
+export async function sendMessage(conversationId: string, senderId: string, content: string): Promise<void> {
+  const { error } = await supabase.from("messages").insert({
+    conversation_id: conversationId,
+    sender_id: senderId,
+    content: content.trim(),
+  });
+  if (error) throw new Error(error.message);
+  try {
+    await supabase.from("conversations")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", conversationId);
+  } catch {}
+}
+
+export function subscribeToMessages(
+  conversationId: string,
+  callback: (msg: ChatMessage) => void
+): ReturnType<typeof supabase.channel> {
+  return supabase
+    .channel(`messages:${conversationId}`)
+    .on("postgres_changes" as any, {
+      event: "INSERT",
+      schema: "public",
+      table: "messages",
+      filter: `conversation_id=eq.${conversationId}`,
+    }, (payload: any) => {
+      const row = payload.new as any;
+      callback({ id: row.id, conversationId: row.conversation_id, senderId: row.sender_id, content: row.content, createdAt: row.created_at });
+    })
+    .subscribe();
+}
+
+export async function markConversationRead(conversationId: string, userId: string): Promise<void> {
+  try {
+    await supabase
+      .from("conversation_participants")
+      .update({ unread_count: 0, last_read_at: new Date().toISOString() })
+      .eq("conversation_id", conversationId)
+      .eq("user_id", userId);
+  } catch {}
+}
+
 // ─── User Sessions ────────────────────────────────────────────────────────────
 
 export interface UserSessionRow {

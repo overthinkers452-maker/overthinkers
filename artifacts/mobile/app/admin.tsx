@@ -14,11 +14,14 @@ import type { ReportGroup } from "@/lib/thoughtsService";
 export default function AdminScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { isAdmin, isModerator, canAct, queue, loading, actionLoading, error, refresh, dismiss, remove, warn } = useAdmin();
+  const { isAdmin, isModerator, canAct, queue, loading, actionLoading, error, refresh, dismiss, remove, warn, ban } = useAdmin();
 
   const [warnTarget, setWarnTarget] = useState<ReportGroup | null>(null);
   const [warnReason, setWarnReason] = useState("");
   const [warnBusy, setWarnBusy] = useState(false);
+  const [banTarget, setBanTarget] = useState<ReportGroup | null>(null);
+  const [banReason, setBanReason] = useState("");
+  const [banBusy, setBanBusy] = useState(false);
 
   useEffect(() => {
     if (!canAct) return;
@@ -30,6 +33,24 @@ export default function AdminScreen() {
     setWarnTarget(group);
     setWarnReason("");
   }, []);
+
+  const onBanPress = useCallback((group: ReportGroup) => {
+    if (!group.authorId) return;
+    setBanTarget(group);
+    setBanReason("");
+  }, []);
+
+  const onBanSubmit = useCallback(async () => {
+    if (!banTarget || !banReason.trim()) return;
+    setBanBusy(true);
+    try {
+      await ban(banTarget, banReason.trim());
+      setBanTarget(null);
+      setBanReason("");
+    } finally {
+      setBanBusy(false);
+    }
+  }, [banTarget, banReason, ban]);
 
   const onWarnSubmit = useCallback(async () => {
     if (!warnTarget || !warnReason.trim()) return;
@@ -99,6 +120,16 @@ export default function AdminScreen() {
                 <Text style={[s.actionText, { color: "#F97316" }]}>Warn</Text>
               </TouchableOpacity>
             )}
+            {item.authorId && (
+              <TouchableOpacity
+                style={[s.actionBtn, { backgroundColor: "#FEF2F2", borderColor: "#FCA5A5" }]}
+                onPress={() => onBanPress(item)}
+                activeOpacity={0.7}
+              >
+                <Feather name="slash" size={14} color="#EF4444" />
+                <Text style={[s.actionText, { color: "#EF4444" }]}>Ban</Text>
+              </TouchableOpacity>
+            )}
             {isAdmin && (
               <TouchableOpacity
                 style={[s.actionBtn, { backgroundColor: colors.disagree + "12", borderColor: colors.disagree + "40" }]}
@@ -164,7 +195,7 @@ export default function AdminScreen() {
         }
       />
 
-      {/* Cross-platform warn modal with TextInput */}
+      {/* Warn modal */}
       <Modal
         visible={warnTarget !== null}
         transparent
@@ -210,6 +241,59 @@ export default function AdminScreen() {
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <Text style={[s.warnBtnText, { color: "#fff" }]}>Issue Strike</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Ban modal */}
+      <Modal
+        visible={banTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBanTarget(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={s.modalOverlay}
+        >
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setBanTarget(null)} />
+          <View style={[s.warnModal, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={s.warnHandle} />
+            <Text style={[s.warnTitle, { color: "#EF4444" }]}>Ban User</Text>
+            <Text style={[s.warnSubtitle, { color: colors.mutedForeground }]}>
+              The user will be immediately signed out and permanently prevented from accessing the platform.
+            </Text>
+            <TextInput
+              value={banReason}
+              onChangeText={setBanReason}
+              placeholder="Reason for ban…"
+              placeholderTextColor={colors.mutedForeground}
+              style={[s.warnInput, { backgroundColor: colors.secondary, borderColor: colors.border, color: colors.foreground }]}
+              multiline
+              autoFocus
+              returnKeyType="done"
+            />
+            <View style={s.warnActions}>
+              <TouchableOpacity
+                style={[s.warnBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                onPress={() => setBanTarget(null)}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.warnBtnText, { color: colors.mutedForeground }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.warnBtn, { backgroundColor: "#EF4444", borderColor: "#EF4444", opacity: banReason.trim() ? 1 : 0.4 }]}
+                onPress={onBanSubmit}
+                activeOpacity={0.7}
+                disabled={!banReason.trim() || banBusy}
+              >
+                {banBusy ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={[s.warnBtnText, { color: "#fff" }]}>Ban User</Text>
                 )}
               </TouchableOpacity>
             </View>

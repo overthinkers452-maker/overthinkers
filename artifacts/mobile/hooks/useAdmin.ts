@@ -73,5 +73,20 @@ export function useAdmin() {
     }
   }, [canAct]);
 
-  return { isAdmin, isModerator, canAct, queue, loading, actionLoading, error, refresh, dismiss, remove, warn };
+  const ban = useCallback(async (group: ReportGroup, reason: string) => {
+    if (!canAct || !group.authorId) return;
+    const key = `${group.targetType}:${group.targetId}`;
+    setActionLoading(key);
+    setError(null);
+    try {
+      await svc.banUser(group.authorId, reason);
+      setQueue(q => q.filter(g => !(g.targetId === group.targetId && g.targetType === group.targetType)));
+    } catch (e: any) {
+      setError(e?.message ?? "Action failed");
+    } finally {
+      setActionLoading(null);
+    }
+  }, [canAct]);
+
+  return { isAdmin, isModerator, canAct, queue, loading, actionLoading, error, refresh, dismiss, remove, warn, ban };
 }

@@ -66,3 +66,97 @@ create policy "Users can manage their own sessions" on public.user_sessions
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create index if not exists idx_user_sessions_user_id on public.user_sessions(user_id);
+
+-- 4. Ban/suspend users (moderator + admin action)
+alter table public.profiles
+  add column if not exists is_banned boolean not null default false;
+
+alter table public.profiles
+  add column if not exists banned_reason text;
+
+-- Prevent banned users from un-banning themselves via update
+drop policy if exists "Users can update own profile (restricted fields)" on public.profiles;
+create policy "Users can update own profile (restricted fields)" on public.profiles
+  for update using (auth.uid() = id)
+  with check (
+    auth.uid() = id
+    AND is_admin     = (SELECT p.is_admin     FROM public.profiles p WHERE p.id = auth.uid())
+    AND is_moderator = (SELECT p.is_moderator FROM public.profiles p WHERE p.id = auth.uid())
+    AND strike_count = (SELECT p.strike_count FROM public.profiles p WHERE p.id = auth.uid())
+    AND is_banned    = (SELECT p.is_banned    FROM public.profiles p WHERE p.id = auth.uid())
+  );
+
+-- 5. 1-to-1 Chat Messaging
+
+create table if not exists public.conversations (
+  id uuid default uuid_generate_v4() primary key,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.conversations enable row level security;
+
+create table if not exists public.conversation_participants (
+  conversation_id uuid references public.conversations(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  unread_count int not null default 0,
+  last_read_at timestamptz,
+  primary key (conversation_id, user_id)
+);
+alter table public.conversation_participants enable row level security;
+
+create table if not exists public.messages (
+  id uuid default uuid_generate_v4() primary key,
+  conversation_id uuid references public.conversations(id) on delete cascade not null,
+  sender_id uuid references public.profiles(id) on delete set null,
+  content text not null check (length(content) between 1 and 2000),
+  created_at timestamptz not null default now()
+);
+alter table public.messages enable row level security;
+
+-- RLS: conversations visible to participants only
+create policy "Participants can see their conversations" on public.conversations
+  for select using (
+    exists (
+      select 1 from public.conversation_participants cp
+      where cp.conversation_id = id and cp.user_id = auth.uid()
+    )
+  );
+
+-- RLS: participants can see their own participant row + others in their conversations
+create policy "Participants can view conversation members" on public.conversation_participants
+  for select using (
+    exists (
+      select 1 from public.conversation_participants me
+      where me.conversation_id = conversation_participants.conversation_id and me.user_id = auth.uid()
+    )
+  );
+
+create policy "Users can insert their own participant row" on public.conversation_participants
+  for insert with check (user_id = auth.uid());
+
+create policy "Users can update their own participant row" on public.conversation_participants
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- RLS: messages visible/insertable to conversation participants
+create policy "Participants can read messages" on public.messages
+  for select using (
+    exists (
+      select 1 from public.conversation_participants cp
+      where cp.conversation_id = messages.conversation_id and cp.user_id = auth.uid()
+    )
+  );
+
+create policy "Participants can send messages" on public.messages
+  for insert with check (
+    auth.uid() = sender_id
+    and exists (
+      select 1 from public.conversation_participants cp
+      where cp.conversation_id = messages.conversation_id and cp.user_id = auth.uid()
+    )
+  );
+
+-- Realtime enabled on messages (run in Supabase Dashboard → Replication if needed)
+-- alter publication supabase_realtime add table public.messages;
+
+create index if not exists idx_messages_conversation_id on public.messages(conversation_id, created_at desc);
+create index if not exists idx_conv_participants_user_id on public.conversation_participants(user_id);

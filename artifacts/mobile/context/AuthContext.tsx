@@ -36,6 +36,8 @@ export interface AuthProfile {
   is_admin: boolean;
   is_moderator: boolean;
   strike_count: number;
+  is_banned: boolean;
+  banned_reason: string | null;
 }
 
 interface AuthContextType {
@@ -43,6 +45,7 @@ interface AuthContextType {
   user: User | null;
   profile: AuthProfile | null;
   loading: boolean;
+  bannedError: string | null;
   signUp: (email: string, password: string, username: string) => Promise<{ error: AuthError | Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
@@ -79,9 +82,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [bannedError, setBannedError] = useState<string | null>(null);
+
   const fetchProfile = useCallback(async (userId: string) => {
     const data = await fetchProfileWithRetry(userId);
-    if (data) setProfile(data);
+    if (data) {
+      if (data.is_banned) {
+        await supabase.auth.signOut();
+        setBannedError(data.banned_reason ?? "Your account has been suspended. Contact support if you believe this is an error.");
+        return;
+      }
+      setBannedError(null);
+      setProfile(data);
+    }
   }, []);
 
   useEffect(() => {
@@ -241,7 +254,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      session, user, profile, loading,
+      session, user, profile, loading, bannedError,
       signUp, signIn, signOut, resetPassword, resendVerification, changePassword, refreshProfile, updateProfile, deleteAccount,
     }}>
       {children}
