@@ -1,0 +1,116 @@
+## Section 111 — Style & Voice Specification
+
+**Purpose:** Every large PRD written by AI defaults to a generic enterprise register — passive voice, abstract nouns, hollow confidence. This section locks the writing style so the document reads like it was written by a single senior human author, not assembled from templates.
+
+**Tone Anchor**
+The document voice is: *direct, precise, and opinionated.* Write the way a senior PM at Linear writes an internal spec — no hedging, no padding, no "this section will explore." Every sentence asserts something.
+
+**Prohibited Constructions**
+- "This section covers..." → just start with the content
+- "It is important to note that..." → delete and rewrite
+- "Leveraging X to achieve Y" → say what it does
+- Passive voice in requirement statements → always active
+- Bullet points that are single fragments → full sentences or nothing
+
+**Vocabulary Register**
+Use technical terms precisely. Do not define terms that any mid-level product manager already knows. Do define any term that is platform-specific (Quality Score, Alias, Pseudonymous Mode) on first use, then never again.
+
+**Consistency Rules**
+- Platform name: always lowercase — *overthinkers*, never Overthinkers
+- User actions: *post a thought*, not *create content* or *submit a post*
+- Engagement actions: *appreciate*, *disagree*, *repost*, *save* — never like, upvote, share, bookmark
+- Anonymity modes: always *Public / Pseudonymous / Anonymous* with capital first letters
+
+**Cross-Section Deduplication Rule**
+If a concept is fully defined in one section, subsequent sections reference it by name only. No re-explanation. This keeps the document under 45,000 words without losing depth.
+
+**Sample Voice Benchmark**
+
+> Wrong: "The feed ranking system leverages a quality-first approach to surface the most relevant content for each individual user based on their unique behavioral signals."
+
+> Right: "The feed ranks thoughts by Quality Score, adjusted for the reader's category affinity and follow graph. Recency breaks ties. Virality does not."
+
+---
+
+## Section 112 — Output Coherence & Generation Strategy
+
+**Purpose:** At 110+ sections and 40,000+ words, a single generation will drift — early sections will contradict late ones, schemas will go stale, and tone will shift. This section tells the generator how to maintain coherence across the full document length.
+
+**Generation Order**
+Do not generate linearly from Section 1 to 110. Use this order:
+
+1. Sections 49–51 first (stack, database schema, API) — these are the ground truth everything else references
+2. Section 30 (Quality Score formula) — referenced in 14+ other sections
+3. Section 62 (Anonymity System) — referenced in 8+ sections
+4. Sections 1–11 (Foundation) — now grounded in real technical decisions
+5. Sections 12–28 (Product Experience) — reference confirmed schemas
+6. Remaining sections in document order
+
+**Consistency Checkpoints**
+After every 20 sections, verify:
+- Database schema references match Section 50
+- API endpoints referenced match Section 51
+- Quality Score variables match Section 30
+- Posting modes match Section 62
+- Brand name and terminology match Section 111
+
+**Version Token**
+Every schema, formula, or architecture diagram carries a version tag:
+
+```
+// v1.0 — initial spec
+// v1.1 — updated after Section 85 recommendation engine revision
+```
+
+This prevents silent contradictions between early and late sections.
+
+**Numeric Consistency Table**
+Lock these numbers at generation start. Never change them mid-document:
+
+```
+Character limit per thought:     500
+Poll option limit:               4
+Poll duration options:           24h / 48h / 7d
+Comment nesting depth:           3 levels
+Editing window:                  30 minutes
+Soft delete recovery window:     30 days
+Anonymous alias rotation:        per session
+Quality Score decay exponent:    1.5
+Report threshold for auto-hide:  5 reports
+```
+
+---
+
+## Section 113 — Prompt Versioning & Maintenance Protocol
+
+**Purpose:** This prompt will be used across multiple generation attempts, model versions, and document revisions. Without version control, improvements get lost, regressions go unnoticed, and the document drifts from the original intent.
+
+**Prompt Version Log**
+
+```
+v1.0 — Original 110-section structure
+v1.1 — Added Section 111 (Style & Voice)
+v1.2 — Added Section 112 (Coherence Strategy)
+v1.3 — Added Section 113 (This section)
+```
+
+**When to Update This Prompt**
+- A new feature concept is added to the product vision
+- A technology choice in Section 49 changes
+- A regulatory requirement in Section 106 becomes active
+- The competitive landscape in Section 108 materially shifts
+- A generation attempt reveals a structural gap not covered by any section
+
+**Regression Testing for Prompt Changes**
+Before accepting any prompt edit, regenerate Sections 30, 62, and 94 and verify:
+- Quality Score formula is unchanged or intentionally updated
+- Anonymity modes are consistent
+- Financial projections match the cost architecture in Section 95
+
+**Model Compatibility Notes**
+This prompt is calibrated for models with a 100K+ token context window. On shorter context models, split generation at the Part boundaries (after Part 4, after Part 6) and pass the numeric consistency table from Section 112 into each new context as a header.
+
+**Ownership**
+This prompt is a product artifact, not a throwaway input. It should live in the same repository as the PRD output, versioned alongside it, reviewed whenever the PRD is reviewed.
+
+---

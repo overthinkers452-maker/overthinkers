@@ -1,0 +1,1061 @@
+Don't choose anything old; only check what I have given. Skip anything already applied and working properly. If something is partially working, fix it. If something doesn't suit you, add it with full functionality.
+
+DOCUMENT 1 — PRODUCT REQUIREMENTS DOCUMENT (PRD)
+
+Product Name
+
+Overthinkers
+
+One-Line Product Vision
+
+A social platform where people anonymously or publicly share thoughts, emotions, overthinking moments, relatable experiences, polls, and discussions in a safe and engaging community.
+
+
+---
+
+Problem Statement
+
+Most social media platforms reward attention-seeking content.
+
+People often have:
+
+random thoughts
+
+deep emotions
+
+overthinking moments
+
+life questions
+
+relationship confusion
+
+career stress
+
+mental clutter
+
+
+but no dedicated place to express them.
+
+Overthinkers solves this.
+
+
+---
+
+Target Users
+
+Primary Users
+
+Gen Z (16–30)
+
+Students
+
+Young professionals
+
+Introverts
+
+Overthinkers
+
+
+Secondary Users
+
+Writers
+
+Content creators
+
+Psychology enthusiasts
+
+Discussion lovers
+
+
+
+---
+
+User Roles
+
+Regular User
+
+Can:
+
+Create thoughts
+
+Like
+
+Comment
+
+Vote
+
+Follow users
+
+Chat
+
+Report content
+
+
+Verified Creator
+
+Can:
+
+Create premium content
+
+Gain badges
+
+Access creator analytics
+
+
+Moderator
+
+Can:
+
+Remove content
+
+Review reports
+
+Ban users
+
+
+Admin
+
+Full platform access.
+
+
+---
+
+Core Features
+
+Authentication
+
+Email login
+
+Google login
+
+Anonymous browsing
+
+Password reset
+
+
+Thought Feed
+
+Hindi thoughts
+
+English thoughts
+
+Hinglish thoughts
+
+
+Categories
+
+Love
+
+Life
+
+Career
+
+Friendship
+
+Family
+
+Motivation
+
+Anxiety
+
+Funny
+
+Confessions
+
+
+Interactions
+
+Like
+
+Comment
+
+Share
+
+Save
+
+Repost
+
+
+Polls
+
+Create polls
+
+Vote
+
+Results
+
+
+Profiles
+
+Avatar
+
+Bio
+
+Followers
+
+Following
+
+
+Notifications
+
+Likes
+
+Comments
+
+Mentions
+
+Followers
+
+
+Messaging
+
+1-to-1 chat
+
+
+Search
+
+Users
+
+Thoughts
+
+Categories
+
+
+
+---
+
+MVP Scope
+
+Version 1 includes:
+
+Auth
+
+Feed
+
+Thought posting
+
+Likes
+
+Comments
+
+Polls
+
+Profiles
+
+Notifications
+
+
+
+---
+
+Not Included In V1
+
+Voice rooms
+
+Live streaming
+
+Video feed
+
+AI therapist
+
+Group chat
+
+Premium subscriptions
+
+
+
+---
+
+Success Metrics
+
+DAU
+
+Retention
+
+Avg session time
+
+Thoughts per user
+
+Comments per post
+
+Poll participation
+
+
+
+---
+
+DOCUMENT 2 — TECHNICAL REQUIREMENTS DOCUMENT (TRD)
+
+Frontend
+
+React Native
+
+Expo Router
+
+TypeScript
+
+
+
+---
+
+State Management
+
+Zustand
+
+
+
+---
+
+Backend
+
+Supabase
+
+
+
+---
+
+Database
+
+PostgreSQL
+
+
+
+---
+
+Authentication
+
+Supabase Auth
+
+Methods:
+
+Email OTP
+
+Google OAuth
+
+Anonymous Guest
+
+
+
+---
+
+Storage
+
+Supabase Storage
+
+Used for:
+
+Profile images
+
+Thought media
+
+Attachments
+
+
+
+---
+
+Realtime
+
+Supabase Realtime
+
+Used for:
+
+Chats
+
+Notifications
+
+Live comments
+
+
+
+---
+
+Push Notifications
+
+Expo Notifications
+
+FCM
+
+
+
+---
+
+Analytics
+
+PostHog
+
+
+
+---
+
+Deployment
+
+Android
+
+Google Play
+
+iOS
+
+Apple App Store
+
+
+---
+
+Security Requirements
+
+RLS on all tables
+
+JWT validation
+
+Rate limiting
+
+Spam protection
+
+
+
+---
+
+Performance Targets
+
+Feed Load:
+
+< 2 seconds
+
+API Response:
+
+< 500ms
+
+Cold Start:
+
+< 3 seconds
+
+
+---
+
+DOCUMENT 3 — APP FLOW DOCUMENT
+
+App Launch
+
+Splash Screen
+
+↓
+
+Onboarding
+
+↓
+
+Authentication
+
+↓
+
+Home Feed
+
+
+---
+
+Home Feed
+
+Actions:
+
+Scroll
+
+Like
+
+Comment
+
+Share
+
+Save
+
+Follow
+
+
+
+---
+
+Create Thought
+
+User taps Create
+
+↓
+
+Write Thought
+
+↓
+
+Select Category
+
+↓
+
+Add Poll (Optional)
+
+↓
+
+Publish
+
+↓
+
+Success Toast
+
+↓
+
+Feed Refresh
+
+
+---
+
+Poll Flow
+
+Create Poll
+
+↓
+
+Publish
+
+↓
+
+Users Vote
+
+↓
+
+Results Update
+
+
+---
+
+Profile Flow
+
+Profile
+
+↓
+
+Edit Profile
+
+↓
+
+Save
+
+↓
+
+Success State
+
+
+---
+
+Error States
+
+No Internet
+
+Show Retry
+
+API Error
+
+Show Error Message
+
+Empty Feed
+
+Show Placeholder
+
+No Notifications
+
+Show Empty State
+
+
+---
+
+DOCUMENT 4 — UI / UX DESIGN BRIEF
+
+Design Direction
+
+Modern
+
+Minimal
+
+Emotion-focused
+
+Community-first
+
+
+---
+
+Theme
+
+Primary:
+
+Purple
+
+Secondary:
+
+Black
+
+Accent:
+
+White
+
+
+---
+
+Feel
+
+Mix of:
+
+Reddit
+
+Threads
+
+Pinterest
+
+Medium
+
+
+
+---
+
+Typography
+
+Headings:
+
+Bold
+
+Body:
+
+Clean readable
+
+
+---
+
+UI Components
+
+Cards
+
+Rounded corners
+
+Soft shadows
+
+
+---
+
+Feed Design
+
+Large readable text
+
+Minimal clutter
+
+Fast scrolling
+
+
+---
+
+Poll Design
+
+Large touch targets
+
+One-tap voting
+
+
+---
+
+Mobile First
+
+Everything optimized for:
+
+Android
+
+iPhone
+
+
+
+---
+
+DOCUMENT 5 — BACKEND SCHEMA DOCUMENT
+
+users
+
+field	type
+
+id	uuid
+username	text
+email	text
+avatar_url	text
+bio	text
+created_at	timestamp
+
+
+
+---
+
+thoughts
+
+field	type
+
+id	uuid
+user_id	uuid
+content	text
+language	text
+category_id	uuid
+created_at	timestamp
+
+
+
+---
+
+categories
+
+field	type
+
+id	uuid
+name	text
+
+
+
+---
+
+comments
+
+field	type
+
+id	uuid
+thought_id	uuid
+user_id	uuid
+content	text
+
+
+
+---
+
+likes
+
+field	type
+
+id	uuid
+user_id	uuid
+thought_id	uuid
+
+
+
+---
+
+polls
+
+field	type
+
+id	uuid
+thought_id	uuid
+
+
+
+---
+
+poll_options
+
+field	type
+
+id	uuid
+poll_id	uuid
+option_text	text
+
+
+
+---
+
+poll_votes
+
+field	type
+
+id	uuid
+poll_id	uuid
+option_id	uuid
+user_id	uuid
+
+
+
+---
+
+notifications
+
+field	type
+
+id	uuid
+user_id	uuid
+type	text
+reference_id	uuid
+
+
+
+---
+
+messages
+
+field	type
+
+id	uuid
+sender_id	uuid
+receiver_id	uuid
+content	text
+
+
+
+---
+
+DOCUMENT 6 — IMPLEMENTATION PLAN
+
+Phase 1
+
+Project Audit
+
+Deliverables:
+
+Full codebase scan
+
+Existing feature mapping
+
+Existing table mapping
+
+Existing API mapping
+
+
+
+---
+
+Phase 2
+
+Foundation
+
+Auth setup
+
+Routing
+
+Theme system
+
+Localization
+
+
+
+---
+
+Phase 3
+
+Database
+
+Schema cleanup
+
+RLS policies
+
+Indexes
+
+
+
+---
+
+Phase 4
+
+Core Feed
+
+Feed
+
+Thought cards
+
+Categories
+
+
+
+---
+
+Phase 5
+
+Engagement
+
+Likes
+
+Comments
+
+Saves
+
+Shares
+
+
+
+---
+
+Phase 6
+
+Poll System
+
+Poll creation
+
+Voting
+
+Results
+
+
+
+---
+
+Phase 7
+
+Profiles
+
+Edit profile
+
+Followers
+
+Following
+
+
+
+---
+
+Phase 8
+
+Notifications
+
+Realtime notifications
+
+Push notifications
+
+
+
+---
+
+Phase 9
+
+Messaging
+
+Chat
+
+Realtime updates
+
+
+
+---
+
+Phase 10
+
+Testing
+
+UI testing
+
+API testing
+
+Database testing
+
+
+
+---
+
+Phase 11
+
+Optimization
+
+Performance
+
+Caching
+
+Lazy loading
+
+
+
+---
+
+Phase 12
+
+Deployment
+
+Android build
+
+iOS build
+
+Production release
+
+
+
+---
+
+DOCUMENT 7 — AI DEVELOPMENT RULES (CRITICAL FOR REPLIT AGENT)
+
+Ye document har prompt ke saath dena chahiye.
+
+Mandatory Rules
+
+1. Analyze entire codebase before coding.
+
+
+2. Create implementation plan before changes.
+
+
+3. Identify already existing features.
+
+
+4. Never duplicate existing functionality.
+
+
+5. Never create duplicate database tables.
+
+
+6. Never modify auth system without dependency analysis.
+
+
+7. Never delete code unless verified unused.
+
+
+8. Search entire project before creating new screens.
+
+
+9. Reuse existing components whenever possible.
+
+
+10. Preserve backward compatibility.
+
+
+11. Fix root cause, not symptoms.
+
+
+12. Generate change report before implementation.
+
+
+13. Generate completion report after implementation.
+
+
+14. If feature already exists:
+
+
+
+Do not rebuild.
+
+Improve existing implementation.
+
+
+15. If schema already exists:
+
+
+
+Extend safely.
+
+Never recreate.
+
+
+16. Before every change verify:
+
+
+
+UI impact
+
+API impact
+
+Database impact
+
+Auth impact
+
+Realtime impact
+
+
+17. Complete one phase fully before starting another.
+
+
+18. Never make assumptions when code already contains answers.
+
+
+19. Validate all TypeScript errors before completion.
+
+
+20. Project stability is higher priority than adding new features.

@@ -1,0 +1,188 @@
+PROJECT: OVERTHINKERS
+
+IMPORTANT: THIS PROJECT HAS ALREADY RECEIVED MULTIPLE FEATURE IMPLEMENTATIONS IN A PREVIOUS REPL.
+
+ASSUME THE CURRENT GITHUB REPOSITORY IS THE SOURCE OF TRUTH.
+
+DO NOT REBUILD EXISTING SYSTEMS.
+
+DO NOT REPEAT PREVIOUS WORK.
+
+DO NOT START WITH A FULL CODEBASE REFACTOR.
+
+WORK IN LOW-CREDIT MODE.
+
+--------------------------------------------------
+PHASE 1: FAST AUDIT
+--------------------------------------------------
+
+Perform a lightweight audit only.
+
+Generate:
+
+1. Existing features
+2. Partially implemented features
+3. Missing features
+
+Use existing code, schema, services and components as the source of truth.
+
+DO NOT modify anything during audit.
+
+Keep audit under 300 lines.
+
+--------------------------------------------------
+PHASE 2: GAP ANALYSIS
+--------------------------------------------------
+
+Compare the current implementation against:
+
+AUTH
+- Password reset
+- Session management
+- Active sessions
+- Logout all devices
+- Security logs
+
+SECURITY
+- RLS
+- Permissions
+- Indexes
+- Audit logging
+
+SOCIAL
+- Followers
+- Following
+- Likes
+- Comments
+- Nested replies
+- Reposts
+- Bookmarks
+- Mentions
+- Hashtags
+
+PRIVACY
+- Private profiles
+- Public profiles
+- Blocks
+- Mutes
+- Hide likes
+- Hide reposts
+
+SEARCH
+- User search
+- Thought search
+- Category search
+- Hashtag search
+
+NOTIFICATIONS
+- Likes
+- Comments
+- Follows
+- Mentions
+- Reposts
+
+MODERATION
+- Reports
+- Moderation actions
+- User strikes
+
+ADMIN
+- Roles
+- Permissions
+- Review queue
+
+PERFORMANCE
+- Feed optimization
+- Infinite scrolling
+- Query optimization
+- Database indexes
+- Caching
+
+--------------------------------------------------
+PHASE 3: IMPLEMENTATION
+--------------------------------------------------
+
+ONLY IMPLEMENT FEATURES THAT ARE MISSING.
+
+SKIP FEATURES THAT:
+
+- Already exist
+- Are mostly complete
+- Have working database schema
+- Have working UI
+- Have working service layer
+
+DO NOT TOUCH COMPLETED FEATURES.
+
+DO NOT REWRITE EXISTING CODE.
+
+DO NOT REORGANIZE FILES.
+
+DO NOT CREATE DUPLICATE TABLES.
+
+DO NOT CREATE DUPLICATE SERVICES.
+
+REUSE EVERYTHING POSSIBLE.
+
+--------------------------------------------------
+SUPABASE RULES
+--------------------------------------------------
+
+Before creating any table:
+
+CHECK if it already exists.
+
+Before creating any policy:
+
+CHECK if it already exists.
+
+Before creating any function:
+
+CHECK if it already exists.
+
+Prefer ALTER statements over rebuilds.
+
+Generate migrations only when required.
+
+--------------------------------------------------
+COST RULES
+--------------------------------------------------
+
+Minimize:
+
+- File changes
+- New files
+- Refactors
+- Token usage
+- Build cycles
+
+Batch related changes together.
+
+Avoid repeated analysis.
+
+--------------------------------------------------
+OUTPUT
+--------------------------------------------------
+
+Before coding provide:
+
+COMPLETED
+PARTIAL
+MISSING
+
+and a short implementation plan.
+
+Then implement ONLY MISSING ITEMS.
+
+After completion provide:
+
+1. Files changed
+2. Database changes
+3. Policies added
+4. Indexes added
+5. Security improvements
+6. Remaining tasks
+
+If no missing features exist:
+
+STOP AND MAKE NO CODE CHANGES.

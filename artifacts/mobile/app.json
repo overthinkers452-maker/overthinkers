@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "overthinkers",
+    "slug": "mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "overthinkers",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#09090E"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.overthinkers.app",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.overthinkers.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#09090E"
+      },
+      "permissions": ["VIBRATE", "RECEIVE_BOOT_COMPLETED"]
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png",
+      "bundler": "metro",
+      "output": "static",
+      "themeColor": "#5B5BD6",
+      "backgroundColor": "#09090E",
+      "shortName": "overthinkers",
+      "display": "standalone",
+      "startUrl": "/mobile/",
+      "scope": "/mobile/",
+      "description": "A quality-first anonymous and pseudonymous discussion platform. Think freely. Post honestly."
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://replit.com/"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      "expo-localization",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#5B5BD6",
+          "defaultChannel": "default",
+          "androidMode": "default",
+          "androidCollapsedTitle": "Overthinkers"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

@@ -1,0 +1,132 @@
+Before making any code changes:
+
+1. Analyze the entire codebase.
+2. Generate an implementation plan.
+3. Identify which requested features already exist.
+4. Identify which features are partially implemented.
+5. Only then begin implementation.
+
+Do not rebuild existing systems.
+Do not duplicate functionality.
+PROJECT: OVERTHINKERS
+
+Analyze the entire codebase before making changes.
+
+Rules:
+
+1. Do not remove existing features.
+2. Reuse existing components whenever possible.
+3. Modify existing files instead of creating unnecessary new files.
+4. Minimize token usage.
+5. Do not generate placeholder code.
+6. Produce production-ready implementations only.
+
+MISSION
+
+Transform the existing application into a secure, scalable social platform while preserving all current functionality.
+
+IMPLEMENT THESE FEATURES:
+
+AUTHENTICATION
+
+- Email verification
+- Password reset
+- Session management
+- Login history
+- Active devices
+- Logout all devices
+- Security logs
+
+SUPABASE SECURITY
+
+Audit all tables.
+
+Implement:
+
+- Row Level Security on every table
+- Least privilege permissions
+- Secure storage access
+- Proper indexes
+- Database performance optimization
+- Audit logging
+
+SOCIAL SYSTEM
+
+Ensure production-ready support for:
+
+- Followers
+- Following
+- Likes
+- Comments
+- Nested replies
+- Reposts
+- Bookmarks
+- Mentions
+- Hashtags
+
+PRIVACY
+
+Add:
+
+- Public profile
+- Private profile
+- Block user
+- Mute user
+- Hide likes
+- Hide reposts
+- Content visibility controls
+
+SEARCH
+
+Implement:
+
+- User search
+- Thought search
+- Category search
+- Hashtag search
+
+NOTIFICATIONS
+
+Create:
+
+- Like notifications
+- Comment notifications
+- Follow notifications
+- Mention notifications
+- Repost notifications
+
+MODERATION FOUNDATION
+
+Create:
+
+reports
+moderation_actions
+user_strikes
+
+tables and complete workflows.
+
+ADMIN SYSTEM
+
+Create:
+
+- Admin role
+- Moderator role
+- Permission system
+- Review queue
+
+PERFORMANCE
+
+Optimize:
+
+- Feed loading
+- Infinite scrolling
+- Supabase queries
+- Realtime subscriptions
+
+At completion generate:
+
+1. Files changed
+2. Database changes
+3. New policies
+4. Security improvements
+5. Remaining tasks

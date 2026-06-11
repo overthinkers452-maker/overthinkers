@@ -1,0 +1,46 @@
+## Section 114 — Conflict Resolution & Self-Audit Protocol
+
+**Conflict Resolution Rule**
+When a design decision in one section conflicts with a schema or formula in another, do not resolve it silently. Flag it inline using this exact format:
+
+```
+// CONFLICT: Section [X] states [A], Section [Y] states [B].
+// Precedence: Section [Y] — schema and formula sections
+// (49, 50, 51, 30, 62) override product description sections.
+// Resolution: [state what was done]
+```
+
+Precedence order when conflicts arise:
+```
+1. Section 50 — Database schema (ground truth for data)
+2. Section 30 — Quality Score formula (ground truth for scoring)
+3. Section 62 — Anonymity system (ground truth for posting modes)
+4. Section 49 — Tech stack (ground truth for implementation)
+5. All other sections defer to the above four
+```
+
+**Self-Audit Checklist**
+After completing all sections, produce this checklist before the document is considered done. Every item must pass before output is delivered.
+
+```
+Self-Audit — overthinkers PRD
+
+[ ] 1. All database table references match Section 50 schema exactly
+[ ] 2. All API endpoints referenced match Section 51 exactly
+[ ] 3. Quality Score formula variables are identical to Section 30
+        in every section that references them
+[ ] 4. Posting modes (Public / Pseudonymous / Anonymous) are
+        described consistently with Section 62 in every section
+[ ] 5. All numeric constants match the consistency table
+        in Section 112 — no undeclared deviations
+[ ] 6. Platform name appears as lowercase "overthinkers"
+        throughout — zero exceptions
+[ ] 7. Engagement actions use only: appreciate, disagree,
+        repost, save — no synonyms anywhere
+[ ] 8. No section re-explains a concept already fully defined
+        in a prior section
+[ ] 9. Every conflict encountered was flagged inline using
+        the conflict resolution format — none resolved silently
+[ ] 10. Tone matches Section 111 voice benchmark throughout —
+         no hedging, no padding, no passive requirements
+```

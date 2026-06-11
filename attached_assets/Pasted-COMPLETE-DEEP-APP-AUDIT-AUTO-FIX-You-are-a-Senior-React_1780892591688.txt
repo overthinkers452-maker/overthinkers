@@ -1,0 +1,132 @@
+COMPLETE DEEP APP AUDIT & AUTO-FIX
+
+You are a Senior React Native, Expo Router, TypeScript, Supabase, PostgreSQL, QA, Security, Performance, and Mobile Architecture Engineer.
+
+Your task is to perform a COMPLETE DEEP ANALYSIS of the entire codebase before making any changes.
+
+Rules
+
+- Read every file in the project.
+- Trace all imports and dependencies.
+- Analyze navigation, screens, components, hooks, contexts, services, database, and Supabase integration.
+- Do not assume anything.
+- Verify everything from actual code.
+
+Audit Requirements
+
+Find and document:
+
+Code Issues
+
+- Syntax errors
+- TypeScript errors
+- Build errors
+- Runtime errors
+- Import/export issues
+- Dead code
+- Unused files
+- Circular dependencies
+
+UI/UX Issues
+
+- Broken layouts
+- Keyboard overlap problems
+- Overflow issues
+- Responsive issues
+- Empty states
+- Loading states
+- Navigation bugs
+- Broken buttons
+
+Functional Issues
+
+- Features not working
+- Partially working features
+- Missing functionality
+- Broken forms
+- Broken API calls
+- Broken state updates
+
+Supabase Audit
+
+- Verify connection
+- Verify environment variables
+- Verify authentication
+- Verify database queries
+- Verify RLS policies
+- Verify storage
+- Verify realtime subscriptions
+
+Database Audit
+
+- Missing tables
+- Missing indexes
+- Missing foreign keys
+- Query performance issues
+- Broken relationships
+
+Realtime Audit
+
+- Check if feed updates instantly
+- Check likes
+- Check comments
+- Check notifications
+- Check presence system
+- Fix any non-realtime behavior
+
+Performance Audit
+
+- Slow screens
+- Excessive re-renders
+- Memory leaks
+- Unoptimized FlatLists
+- Slow database queries
+- Duplicate requests
+
+Security Audit
+
+- Insecure queries
+- Missing validation
+- Missing authorization
+- Exposed secrets
+- Weak session handling
+
+Auto Fix Mode
+
+After completing the audit:
+
+1. Fix every detected error.
+2. Fix every warning.
+3. Fix every broken feature.
+4. Fix every navigation issue.
+5. Fix every database issue.
+6. Fix every realtime issue.
+7. Fix every performance issue.
+8. Fix every security issue.
+
+Do not stop after fixing one issue.
+
+Continue scanning the project until no major issues remain.
+
+Final Verification
+
+After all fixes:
+
+- Run full project validation.
+- Verify all screens.
+- Verify all user flows.
+- Verify all database operations.
+- Verify all realtime functionality.
+- Verify authentication flow.
+- Verify production readiness.
+
+Reports
+
+Generate:
+
+/docs/FULL_AUDIT_REPORT.md
+/docs/ERRORS_FOUND.md
+/docs/FIXES_APPLIED.md
+/docs/PRODUCTION_READINESS.md
+
+The goal is to leave the application in the most stable, bug-free, secure, optimized, and production-ready state possible.
