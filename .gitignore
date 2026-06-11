@@ -29,6 +29,8 @@ node_modules
 
 # environment files
 .env
+artifacts/mobile/.env
+artifacts/mobile/.env.txt
 
 # misc
 /.sass-cache
