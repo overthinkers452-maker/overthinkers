@@ -39,7 +39,6 @@ export default function HomeScreen() {
   const { blockedWords, appLanguage } = useSettings();
   const [activeFeed, setActiveFeed] = useState<FeedTypeNew>("For You");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [activeLanguage, setActiveLanguage] = useState<"en" | "hi" | "hinglish" | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [feedError, setFeedError] = useState<"offline" | "error" | null>(null);
 
@@ -65,9 +64,6 @@ export default function HomeScreen() {
     }
     if (activeCategory) {
       base = base.filter(t => t.category.toLowerCase() === activeCategory.toLowerCase());
-    }
-    if (activeLanguage) {
-      base = base.filter(t => (t.language ?? "en") === activeLanguage);
     }
     return applyFeedFilters(base, { blockedWords, isBlocked, isMuted, currentUserId: currentUser.id });
   };
@@ -115,11 +111,14 @@ export default function HomeScreen() {
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={styles.header}>
-        <Text style={styles.logo}>overthinkers</Text>
+        <Text style={styles.logo} numberOfLines={1} ellipsizeMode="tail">overthinkers</Text>
         <TouchableOpacity
           style={styles.bellBtn}
           onPress={() => router.push("/(tabs)/notifications")}
           activeOpacity={0.8}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityLabel="Open notifications"
+          accessibilityRole="button"
         >
           <Feather name="bell" size={22} color={colors.foreground} />
           {unreadCount > 0 && (
@@ -184,41 +183,7 @@ export default function HomeScreen() {
         </ScrollView>
       </View>
 
-      <View style={styles.langWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.langContent}
-        >
-          {(
-            [
-              { value: "en" as const, label: "English" },
-              { value: "hi" as const, label: "हिंदी" },
-              { value: "hinglish" as const, label: "Hinglish" },
-            ] as const
-          ).map(lang => {
-            const isActive = activeLanguage === lang.value;
-            return (
-              <TouchableOpacity
-                key={lang.value}
-                onPress={() => setActiveLanguage(isActive ? null : lang.value)}
-                style={[
-                  styles.langChip,
-                  {
-                    borderColor: isActive ? colors.primary : colors.border,
-                    backgroundColor: isActive ? colors.primary + "15" : colors.card,
-                  },
-                ]}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.langChipText, { color: isActive ? colors.primary : colors.mutedForeground }]}>
-                  {lang.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+      {/* Language filters removed — kept for future feature toggles */}
 
       {feedError && (
         <View style={[styles.errorBanner, {
@@ -380,25 +345,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
       fontSize: 13,
       fontFamily: "Inter_500Medium",
     },
-    langWrapper: {
-      paddingVertical: 6,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    langContent: {
-      paddingHorizontal: 12,
-      gap: 6,
-    },
-    langChip: {
-      borderWidth: 1,
-      borderRadius: 20,
-      paddingHorizontal: 12,
-      paddingVertical: 5,
-    },
-    langChipText: {
-      fontSize: 12,
-      fontFamily: "Inter_500Medium",
-    },
+    // language styles removed
     fab: {
       position: "absolute",
       right: 18,

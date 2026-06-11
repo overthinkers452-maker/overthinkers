@@ -269,39 +269,35 @@ export const ThoughtCard = React.memo(function ThoughtCard({ thought, showReason
         {/* Feature 1: tappable author */}
         <TouchableOpacity onPress={onAuthorPress} activeOpacity={isAnon ? 1 : 0.7} style={s.authorRow}>
           <View style={[s.avatar, { backgroundColor: avatarBg }]}>
-            <Text style={[s.avatarText, { color: avatarTextColor }]}>
-              {isAnon ? "?" : authorDisplay.charAt(0).toUpperCase()}
-            </Text>
+            <Text style={[s.avatarText, { color: avatarTextColor }]}> {isAnon ? "?" : authorDisplay.charAt(0).toUpperCase()} </Text>
           </View>
           <View style={s.authorInfo}>
-            <View style={s.authorNameRow}>
-              <Text style={[s.authorName, !isAnon && { color: colors.primary }]}>{authorDisplay}</Text>
-              {!isOwnThought && !isAnon && (
-                <TouchableOpacity
-                  onPress={onFollow}
-                  style={[
-                    s.followPill,
-                    isFollowing
-                      ? { backgroundColor: colors.secondary, borderColor: colors.border }
-                      : { backgroundColor: colors.primary + "15", borderColor: colors.primary + "40" },
-                  ]}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[s.followText, { color: isFollowing ? colors.mutedForeground : colors.primary }]}>
-                    {isFollowing ? "Following" : "Follow"}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            <Text style={s.meta}>
-              {thought.category} · {timeAgo(thought.createdAt)}
-              {thought.isEdited && <Text style={s.editedMark}> · edited</Text>}
+            <Text style={[s.authorName, !isAnon && { color: colors.primary }]} numberOfLines={1} ellipsizeMode="tail">{authorDisplay}</Text>
+            <Text style={s.meta} numberOfLines={1} ellipsizeMode="tail">
+              {thought.category} · {timeAgo(thought.createdAt)}{thought.isEdited ? " · edited" : ""}
             </Text>
           </View>
         </TouchableOpacity>
 
         <View style={s.headerRight}>
+          {!isOwnThought && !isAnon && (
+            <TouchableOpacity
+              onPress={onFollow}
+              style={[
+                s.followPill,
+                isFollowing
+                  ? { backgroundColor: colors.secondary, borderColor: colors.border }
+                  : { backgroundColor: colors.primary + "15", borderColor: colors.primary + "40" },
+              ]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              activeOpacity={0.7}
+            >
+              <Text style={[s.followText, { color: isFollowing ? colors.mutedForeground : colors.primary }]}>
+                {isFollowing ? "Following" : "Follow"}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {(thought.authorStrikeCount ?? 0) >= 3 ? (
             <View style={[s.modeBadge, { backgroundColor: "#FEF3C7", borderColor: "#FCD34D" }]}>
               <Feather name="alert-triangle" size={11} color="#D97706" />
@@ -313,6 +309,7 @@ export const ThoughtCard = React.memo(function ThoughtCard({ thought, showReason
               <Text style={[s.modeText, { color: modeColor }]}>{modeLabel(appLanguage, thought.postingMode)}</Text>
             </View>
           )}
+
           <TouchableOpacity style={s.menuBtn} onPress={onMenuPress} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Feather name="more-horizontal" size={18} color={colors.mutedForeground} />
           </TouchableOpacity>
@@ -434,14 +431,14 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     repostBannerText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
     feedReasonRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 8 },
     feedReason: { fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular" },
-    header: { flexDirection: "row", alignItems: "center", marginBottom: 10, gap: 10 },
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 10 },
     authorRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
     avatar: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", flexShrink: 0 },
     avatarText: { fontSize: 15, fontFamily: "Inter_700Bold" },
-    authorInfo: { flex: 1 },
-    authorNameRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
-    authorName: { fontSize: 14, fontFamily: "Inter_700Bold", color: colors.foreground, marginBottom: 1 },
-    followPill: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 1 },
+    authorInfo: { flex: 1, minWidth: 80 },
+    authorNameRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "nowrap" },
+    authorName: { fontSize: 14, fontFamily: "Inter_700Bold", color: colors.foreground, flexShrink: 1 },
+    followPill: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, minWidth: 74, alignItems: "center", justifyContent: "center" },
     followText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
     meta: { fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular" },
     editedMark: { fontSize: 11, color: colors.mutedForeground, fontStyle: "italic" },

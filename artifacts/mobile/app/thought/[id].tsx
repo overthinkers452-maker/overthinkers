@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -164,6 +164,8 @@ export default function ThoughtDetailScreen() {
   const threadComments = allComments.filter(c => !c.parentId);
 
   const styles = makeStyles(colors);
+  const listRef = useRef<FlatList<any> | null>(null);
+  const INPUT_BAR_HEIGHT = 92;
 
   if (!thought) {
     return (
@@ -312,7 +314,7 @@ export default function ThoughtDetailScreen() {
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: colors.background }]}
         behavior={Platform.OS === "ios" ? "padding" : Platform.OS === "android" ? "height" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 64 : 0}
       >
         {isEditing ? (
           <View style={[styles.editContainer, { backgroundColor: colors.background }]}>
@@ -340,12 +342,15 @@ export default function ThoughtDetailScreen() {
           </View>
         ) : (
           <FlatList
+            ref={listRef}
             data={threadComments}
             keyExtractor={item => item.id}
             renderItem={renderComment}
             scrollEnabled={!!threadComments.length}
+            keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingTop: 4, paddingBottom: bottomPad + INPUT_BAR_HEIGHT }}
             ListHeaderComponent={
               <View>
                 <ThoughtCard thought={thought} showReason={false} />
@@ -368,7 +373,7 @@ export default function ThoughtDetailScreen() {
         )}
 
         {!isEditing && (
-          <View style={[styles.inputBar, { borderTopColor: colors.border, paddingBottom: bottomPad + 8, backgroundColor: colors.background }]}>
+          <View style={[styles.inputBar, { borderTopColor: colors.border, backgroundColor: colors.background, position: "absolute", left: 0, right: 0, bottom: bottomPad, paddingBottom: 8 }]}> 
             {replyingToId && (
               <View style={[styles.replyBanner, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "30" }]}>
                 <Feather name="corner-down-right" size={12} color={colors.primary} />
@@ -400,6 +405,17 @@ export default function ThoughtDetailScreen() {
                 onChangeText={setReplyText}
                 multiline
                 maxLength={500}
+                onFocus={() => {
+                  setTimeout(() => {
+                    if (listRef.current) {
+                      const anyRef = listRef.current as any;
+                      try {
+                        if (typeof anyRef.scrollToEnd === "function") anyRef.scrollToEnd({ animated: true });
+                        else if (typeof anyRef.scrollToOffset === "function") anyRef.scrollToOffset({ offset: 99999, animated: true });
+                      } catch {}
+                    }
+                  }, 150);
+                }}
               />
               <TouchableOpacity
                 onPress={onSubmitComment}
